@@ -1,22 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Oqtane.Documentation;
+using Oqtane.Models;
 using Oqtane.Modules;
 using Oqtane.Services;
-using Oqtane.Shared;
 using Oqtane.UI;
 
 namespace Oqtane.Client
@@ -66,6 +69,14 @@ namespace Oqtane.Client
 
         private static async Task LoadClientAssemblies(HttpClient http, IServiceProvider serviceProvider)
         {
+            // get alias
+            var navigationManager = serviceProvider.GetRequiredService<NavigationManager>();
+            var urlpath = GetUrlPath(navigationManager.Uri);
+            var json = await http.GetStringAsync($"api/Installation/installed/?path={WebUtility.UrlEncode(urlpath)}");
+            var installation = JsonSerializer.Deserialize<Installation>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            urlpath = installation.Alias.Path;
+            urlpath = (!string.IsNullOrEmpty(urlpath)) ? urlpath + "/" : urlpath;
+
             var dlls = new Dictionary<string, byte[]>();
             var pdbs = new Dictionary<string, byte[]>();
             var list = new List<string>();
@@ -77,7 +88,7 @@ namespace Oqtane.Client
             if (files.Count() != 0)
             {
                 // get list of assemblies from server
-                var json = await http.GetStringAsync("/api/Installation/list");
+                json = await http.GetStringAsync($"{urlpath}api/Installation/list");
                 var assemblies = JsonSerializer.Deserialize<List<string>>(json);
 
                 // determine which assemblies need to be downloaded
@@ -139,7 +150,7 @@ namespace Oqtane.Client
             if (list.Count != 0)
             {
                 // get assemblies from server and load into client app domain
-                var zip = await http.GetByteArrayAsync($"/api/Installation/load?list=" + string.Join(",", list));
+                var zip = await http.GetByteArrayAsync($"{urlpath}api/Installation/load?list=" + string.Join(",", list));
 
                 // asemblies and debug symbols are packaged in a zip file
                 using (ZipArchive archive = new ZipArchive(new MemoryStream(zip)))
@@ -198,23 +209,37 @@ namespace Oqtane.Client
         private static void RegisterModuleServices(Assembly assembly, IServiceCollection services)
         {
             // dynamically register module scoped services
-            var implementationTypes = assembly.GetInterfaces<IService>();
-            foreach (var implementationType in implementationTypes)
+            try
             {
-                if (implementationType.AssemblyQualifiedName != null)
+                var implementationTypes = assembly.GetInterfaces<IService>();
+                foreach (var implementationType in implementationTypes)
                 {
-                    var serviceType = Type.GetType(implementationType.AssemblyQualifiedName.Replace(implementationType.Name, $"I{implementationType.Name}"));
-                    services.AddScoped(serviceType ?? implementationType, implementationType);
+                    if (implementationType.AssemblyQualifiedName != null)
+                    {
+                        var serviceType = Type.GetType(implementationType.AssemblyQualifiedName.Replace(implementationType.Name, $"I{implementationType.Name}"));
+                        services.AddScoped(serviceType ?? implementationType, implementationType);
+                    }
                 }
+            }
+            catch
+            {
+                // could not interrogate assembly - likely missing dependencies
             }
         }
 
         private static void RegisterClientStartups(Assembly assembly, IServiceCollection services)
         {
-            var startUps = assembly.GetInstances<IClientStartup>();
-            foreach (var startup in startUps)
+            try
             {
-                startup.ConfigureServices(services);
+                var startUps = assembly.GetInstances<IClientStartup>();
+                foreach (var startup in startUps)
+                {
+                    startup.ConfigureServices(services);
+                }
+            }
+            catch
+            {
+                // could not interrogate assembly - likely missing dependencies
             }
         }
 
@@ -240,6 +265,11 @@ namespace Oqtane.Client
             var cultureInfo = CultureInfo.GetCultureInfo(culture);
             CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
             CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
+        }
+
+        private static string GetUrlPath(string url)
+        {
+            return new Uri(url).AbsolutePath.Substring(1);
         }
     }
 }

@@ -1,16 +1,20 @@
 using System;
+using Oqtane.Models;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Oqtane.Shared
 {
     public class Constants
     {
-        public static readonly string Version = "3.2.1";
-        public const string ReleaseVersions = "1.0.0,1.0.1,1.0.2,1.0.3,1.0.4,2.0.0,2.0.1,2.0.2,2.1.0,2.2.0,2.3.0,2.3.1,3.0.0,3.0.1,3.0.2,3.0.3,3.1.0,3.1.1,3.1.2,3.1.3,3.1.4,3.2.0,3.2.1";
+        public static readonly string Version = "5.0.0";
+        public const string ReleaseVersions = "1.0.0,1.0.1,1.0.2,1.0.3,1.0.4,2.0.0,2.0.1,2.0.2,2.1.0,2.2.0,2.3.0,2.3.1,3.0.0,3.0.1,3.0.2,3.0.3,3.1.0,3.1.1,3.1.2,3.1.3,3.1.4,3.2.0,3.2.1,3.3.0,3.3.1,3.4.0,3.4.1,3.4.2,3.4.3,4.0.0,4.0.1,4.0.2,4.0.3,4.0.4,4.0.5,4.0.6,5.0.0";
         public const string PackageId = "Oqtane.Framework";
         public const string ClientId = "Oqtane.Client";
         public const string UpdaterPackageId = "Oqtane.Updater";
         public const string PackageRegistryUrl = "https://www.oqtane.net";
 
+        public const string DataDirectory = "DataDirectory";
         public const string DefaultDBType = "Oqtane.Database.SqlServer.SqlServerDatabase, Oqtane.Database.SqlServer";
 
         public const string PageComponent = "Oqtane.UI.ThemeBuilder, Oqtane.Client";
@@ -37,6 +41,8 @@ namespace Oqtane.Shared
         public const string ModuleMessageComponent = "Oqtane.Modules.Controls.ModuleMessage, Oqtane.Client";
 
         public const string DefaultSiteTemplate = "Oqtane.SiteTemplates.DefaultSiteTemplate, Oqtane.Server";
+
+        public static readonly string[] DefaultHostModuleTypes = new[] { "Upgrade", "Themes", "SystemInfo", "Sql", "Sites", "ModuleDefinitions", "Logs", "Jobs", "ModuleCreator" };
 
         public const string FileUrl = "/files/";
         public const string ImageUrl = "/api/file/image/";
@@ -73,8 +79,8 @@ namespace Oqtane.Shared
         public static readonly string HttpContextSiteSettingsKey = "SiteSettings";
 
         public static readonly string MauiUserAgent = "MAUI";
-
-        public static readonly string RequireEntityId = "RequireEntityId";
+        public static readonly string MauiAliasPath = "Alias-Path";
+        public static readonly string VisitorCookiePrefix = "APP_VISITOR_";
 
         // Obsolete constants
 

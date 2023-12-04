@@ -6,6 +6,7 @@ using System;
 using Microsoft.AspNetCore.Hosting;
 using Oqtane.Infrastructure;
 using Microsoft.AspNetCore.Http.Features;
+using System.IO;
 
 namespace Oqtane.Controllers
 {
@@ -51,13 +52,27 @@ namespace Oqtane.Controllers
                     systeminfo.Add("Logging:LogLevel:Default", _configManager.GetSetting("Logging:LogLevel:Default", "Information"));
                     systeminfo.Add("Logging:LogLevel:Notify", _configManager.GetSetting("Logging:LogLevel:Notify", "Error"));
                     systeminfo.Add("UseSwagger", _configManager.GetSetting("UseSwagger", "true"));
-                    systeminfo.Add("PackageService", _configManager.GetSetting("PackageService", "true"));
+                    systeminfo.Add("PackageRegistryUrl", _configManager.GetSetting("PackageRegistryUrl", Constants.PackageRegistryUrl));
+                    break;
+                case "log":
+                    string log = "";
+                    string path = Path.Combine(_environment.ContentRootPath, "Content", "Log", "error.log");
+                    if (System.IO.File.Exists(path))
+                    {
+                        log = System.IO.File.ReadAllText(path);
+                    }
+                    systeminfo.Add("Log", log);
+                    break;
+                case "connectionstrings":
+                    foreach (var kvp in _configManager.GetSettings(SettingKeys.ConnectionStringsSection))
+                    {
+                        systeminfo.Add(kvp.Key, kvp.Value);
+                    }
                     break;
             }
 
             return systeminfo;
         }
-
 
         // GET: api/<controller>
         [HttpGet("{key}/{value}")]
@@ -74,16 +89,45 @@ namespace Oqtane.Controllers
         {
             foreach(KeyValuePair<string, object> kvp in settings)
             {
-                _configManager.AddOrUpdateSetting(kvp.Key, kvp.Value, false);
+                UpdateSetting(kvp.Key, kvp.Value);
             }
         }
 
-        // PUT: api/<controller>
-        [HttpPut("{key}/{value}")]
-        [Authorize(Roles = RoleNames.Host)]
-        public void Put(string key, object value)
+        // GET: api/<controller>/icons
+        [HttpGet("icons")]
+        public Dictionary<string, string> Get()
         {
-            _configManager.AddOrUpdateSetting(key, value, false);
+            var icons = new Dictionary<string, string>();
+
+            // use reflection to get list of icons from Icons class
+            Type iconsType = typeof(Icons);
+            System.Reflection.FieldInfo[] fields = iconsType.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.GetField);
+            foreach (System.Reflection.FieldInfo field in fields)
+            {
+                if (field.FieldType == typeof(string))
+                {
+                    icons.Add((string)field.GetValue(null), field.Name); // ie. ("oi oi-home", "Home")
+                }
+            }
+
+            return icons;
+        }
+
+        private void UpdateSetting(string key, object value)
+        {
+            switch (key.ToLower())
+            {
+                case "clearlog":
+                    string path = Path.Combine(_environment.ContentRootPath, "Content", "Log", "error.log");
+                    if (System.IO.File.Exists(path))
+                    {
+                        System.IO.File.Delete(path);
+                    }
+                    break;
+                default:
+                    _configManager.AddOrUpdateSetting(key, value, false);
+                    break;
+            }
         }
     }
 }

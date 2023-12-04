@@ -30,6 +30,7 @@ namespace Oqtane.Repository
 
         public Alias AddAlias(Alias alias)
         {
+            alias.Name = alias.Name.Contains("://") ? alias.Name.Substring(alias.Name.IndexOf("://") + 3).ToLower() : alias.Name.ToLower();
             _db.Alias.Add(alias);
             _db.SaveChanges();
             _cache.Remove("aliases");
@@ -38,6 +39,7 @@ namespace Oqtane.Repository
 
         public Alias UpdateAlias(Alias alias)
         {
+            alias.Name = alias.Name.Contains("://") ? alias.Name.Substring(alias.Name.IndexOf("://") + 3).ToLower() : alias.Name.ToLower();
             _db.Entry(alias).State = EntityState.Modified;
             _db.SaveChanges();
             _cache.Remove("aliases");
@@ -67,7 +69,7 @@ namespace Oqtane.Repository
             Alias alias = null;
 
             List<Alias> aliases = GetAliases().ToList();
-            var segments = url.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var segments = url.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
             // iterate segments to find keywords
             int start = segments.Length;

@@ -2,12 +2,11 @@
 @namespace Oqtane.Themes.Controls
 @inherits ContainerBase      
 @attribute [OqtaneIgnore]
-@inject SiteState SiteState
+@inject IStringLocalizer<SharedResources> SharedLocalizer
+@inject IStringLocalizerFactory LocalizerFactory
 
 <span class="app-moduletitle">
-	<a id="@ModuleState.PageModuleId.ToString()">
-		@((MarkupString)title)
-	</a>
+    @((MarkupString)title)
 </span>
 
 @code {
@@ -22,11 +21,12 @@
 	{
 		if (!string.IsNullOrEmpty(ModuleState.ControlTitle))
 		{
-			title = ModuleState.ControlTitle;
+            var localizer = LocalizerFactory.Create(ModuleState.ModuleType);
+            title = localizer[ModuleState.ControlTitle];
 		}
 		else
 		{
-			title = ModuleState.Title;
+            title = SharedLocalizer[ModuleState.Title];
 		}
 	}
 

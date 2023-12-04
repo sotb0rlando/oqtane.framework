@@ -55,9 +55,16 @@ namespace Oqtane.Controllers
                 return urlMapping;
             }
             else
-            { 
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized UrlMapping Get Attempt {UrlMappingId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+            {
+                if (urlMapping != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized UrlMapping Get Attempt {UrlMappingId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -73,8 +80,15 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized UrlMapping Get Attempt {SiteId} {Url}", siteid, url);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (urlMapping != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized UrlMapping Get Attempt {SiteId} {Url}", siteid, url);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -104,7 +118,7 @@ namespace Oqtane.Controllers
         [Authorize(Roles = RoleNames.Admin)]
         public UrlMapping Put(int id, [FromBody] UrlMapping urlMapping)
         {
-            if (ModelState.IsValid && urlMapping.SiteId == _alias.SiteId && _urlMappings.GetUrlMapping(urlMapping.UrlMappingId, false) != null)
+            if (ModelState.IsValid && urlMapping.SiteId == _alias.SiteId && urlMapping.UrlMappingId == id && _urlMappings.GetUrlMapping(urlMapping.UrlMappingId, false) != null)
             {
                 urlMapping = _urlMappings.UpdateUrlMapping(urlMapping);
                 _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.UrlMapping, urlMapping.UrlMappingId, SyncEventActions.Update);

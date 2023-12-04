@@ -6,7 +6,7 @@
 @inject IStringLocalizer<FileManager> Localizer
 @inject IStringLocalizer<SharedResources> SharedLocalizer
 
-@if (_folders != null)
+@if (_initialized)
 {
     <div id="@Id" class="container-fluid px-0">
         <div class="row">
@@ -40,10 +40,17 @@
                             </div>
                         </div>
                     }
+                    else
+                    {
+                        if (FileId != -1 && _file != null && !UploadMultiple)
+                        {
+                            <input class="form-control" @bind="@_file.Name" disabled />
+                        }
+                    }
                     @if (ShowUpload && _haseditpermission)
                     {
-                        <div class="row">
-                            <div class="col mt-2">
+                        <div class="row mt-2">
+                            <div class="col">
                                 @if (UploadMultiple)
                                 {
                                     <input type="file" id="@_fileinputid" name="file" accept="@_filter" multiple />
@@ -53,18 +60,28 @@
                                     <input type="file" id="@_fileinputid" name="file" accept="@_filter" />
                                 }
                             </div>
-                            <div class="col mt-2 text-end">
+                            <div class="col-auto">
                                 <button type="button" class="btn btn-success" @onclick="UploadFiles">@SharedLocalizer["Upload"]</button>
-                                @if (ShowFiles && GetFileId() != -1)
+                                @if (FileId != -1 && !UploadMultiple)
                                 {
                                     <button type="button" class="btn btn-danger mx-1" @onclick="DeleteFile">@SharedLocalizer["Delete"]</button>
                                 }
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col mt-1"><span id="@_progressinfoid" style="display: none;"></span></div>
-                            <div class="col text-center mt-1"><progress id="@_progressbarid" class="mt-1" style="display: none;"></progress></div>
-                        </div>
+                        @if (ShowProgress)
+                        {
+                            <div class="row">
+                                <div class="col mt-1"><span id="@_progressinfoid" style="display: none;"></span></div>
+                                <div class="col mt-1"><progress id="@_progressbarid" class="mt-1" style="display: none;"></progress></div>
+                            </div>
+                        }
+                        else
+                        {
+                            if (_uploading)
+                            {
+                                <div class="app-progress-indicator"></div>
+                            }
+                        }
                     }
                 </div>
             </div>
@@ -87,333 +104,405 @@
 }
 
 @code {
-	private List<Folder> _folders;
-	private List<File> _files = new List<File>();
-	private string _fileinputid = string.Empty;
-	private string _progressinfoid = string.Empty;
-	private string _progressbarid = string.Empty;
-	private string _filter = "*";
-	private bool _haseditpermission = false;
-	private string _image = string.Empty;
-	private File _file = null;
-	private string _guid;
-	private string _message = string.Empty;
-	private MessageType _messagetype;
+    private bool _initialized = false;
+    private List<Folder> _folders;
+    private List<File> _files = new List<File>();
+    private string _fileinputid = string.Empty;
+    private string _progressinfoid = string.Empty;
+    private string _progressbarid = string.Empty;
+    private string _filter = "*";
+    private bool _haseditpermission = false;
+    private string _image = string.Empty;
+    private File _file = null;
+    private string _guid;
+    private string _message = string.Empty;
+    private MessageType _messagetype;
+    private bool _uploading = false;
 
-	[Parameter]
-	public string Id { get; set; } // optional - for setting the id of the FileManager component for accessibility
+    [Parameter]
+    public string Id { get; set; } // optional - for setting the id of the FileManager component for accessibility
 
-	[Parameter]
-	public int FolderId { get; set; } = -1; // optional - for setting a specific default folder by folderid 
+    [Parameter]
+    public int FolderId { get; set; } = -1; // optional - for setting a specific default folder by folderid 
 
-	[Parameter]
-	public string Folder { get; set; } = ""; // optional - for setting a specific default folder by folder path 
+    [Parameter]
+    public string Folder { get; set; } = ""; // optional - for setting a specific default folder by folder path 
 
-	[Parameter]
-	public int FileId { get; set; } = -1; // optional - for selecting a specific file by default
+    [Parameter]
+    public int FileId { get; set; } = -1; // optional - for selecting a specific file by default
 
-	[Parameter]
-	public string Filter { get; set; } // optional - comma delimited list of file types that can be selected or uploaded ie. "jpg,gif"
+    [Parameter]
+    public string Filter { get; set; } // optional - comma delimited list of file types that can be selected or uploaded ie. "jpg,gif"
 
-	[Parameter]
-	public bool ShowFiles { get; set; } = true; // optional - for indicating whether a list of files should be displayed - default is true
+    [Parameter]
+    public bool ShowFiles { get; set; } = true; // optional - for indicating whether a list of files should be displayed - default is true
 
-	[Parameter]
-	public bool ShowUpload { get; set; } = true; // optional - for indicating whether a Upload controls should be displayed - default is true
+    [Parameter]
+    public bool ShowUpload { get; set; } = true; // optional - for indicating whether a Upload controls should be displayed - default is true
 
-	[Parameter]
-	public bool ShowFolders { get; set; } = true; // optional - for indicating whether a list of folders should be displayed - default is true
+    [Parameter]
+    public bool ShowFolders { get; set; } = true; // optional - for indicating whether a list of folders should be displayed - default is true
 
-	[Parameter]
-	public bool ShowImage { get; set; } = true; // optional - for indicating whether an image thumbnail should be displayed - default is true
+    [Parameter]
+    public bool ShowImage { get; set; } = true; // optional - for indicating whether an image thumbnail should be displayed - default is true
 
-	[Parameter]
-	public bool ShowSuccess { get; set; } = false; // optional - for indicating whether a success message should be displayed upon successful upload - default is false
+    [Parameter]
+    public bool ShowProgress { get; set; } = true; // optional - for indicating whether progress info should be displayed during upload - default is true
 
-	[Parameter]
-	public bool UploadMultiple { get; set; } = false; // optional - enable multiple file uploads - default false
+    [Parameter]
+    public bool ShowSuccess { get; set; } = false; // optional - for indicating whether a success message should be displayed upon successful upload - default is false
 
-	[Parameter]
-	public EventCallback<int> OnUpload { get; set; } // optional - executes a method in the calling component when a file is uploaded
+    [Parameter]
+    public bool UploadMultiple { get; set; } = false; // optional - enable multiple file uploads - default false
 
-	[Parameter]
-	public EventCallback<int> OnSelect { get; set; } // optional - executes a method in the calling component when a file is selected
+    [Parameter]
+    public EventCallback<int> OnUpload { get; set; } // optional - executes a method in the calling component when a file is uploaded
 
-	[Parameter]
-	public EventCallback<int> OnDelete { get; set; } // optional - executes a method in the calling component when a file is deleted
+    [Parameter]
+    public EventCallback<int> OnSelect { get; set; } // optional - executes a method in the calling component when a file is selected
 
-	protected override async Task OnInitializedAsync()
-	{
-		// packages folder is a framework folder for uploading installable nuget packages
-		if (Folder == Constants.PackagesFolder)
-		{
-			ShowFiles = false;
-			ShowFolders = false;
-			Filter = "nupkg";
-			ShowSuccess = true;
-		}
+    [Parameter]
+    public EventCallback<int> OnDelete { get; set; } // optional - executes a method in the calling component when a file is deleted
 
-		if (!ShowFiles)
-		{
-			ShowImage = false;
-		}
+    protected override void OnInitialized()
+    {
+        // create unique id for component
+        _guid = Guid.NewGuid().ToString("N");
+        _fileinputid = "FileInput_" + _guid;
+        _progressinfoid = "ProgressInfo_" + _guid;
+        _progressbarid = "ProgressBar_" + _guid;
+    }
 
-		_folders = await FolderService.GetFoldersAsync(ModuleState.SiteId);
+    protected override async Task OnParametersSetAsync()
+    {
+        // packages folder is a framework folder for uploading installable nuget packages
+        if (Folder == Constants.PackagesFolder)
+        {
+            ShowFiles = false;
+            ShowFolders = false;
+            Filter = "nupkg";
+            ShowSuccess = true;
+        }
 
-		if (!string.IsNullOrEmpty(Folder) && Folder != Constants.PackagesFolder)
-		{
-			Folder folder = await FolderService.GetFolderAsync(ModuleState.SiteId, Folder);
-			if (folder != null)
-			{
-				FolderId = folder.FolderId;
-			}
-			else
-			{
-				FolderId = -1;
-				_message = "Folder Path " + Folder + "Does Not Exist";
-				_messagetype = MessageType.Error;
-			}
-		}
+        if (!string.IsNullOrEmpty(Folder) && Folder != Constants.PackagesFolder)
+        {
+            Folder folder = await FolderService.GetFolderAsync(ModuleState.SiteId, Folder);
+            if (folder != null)
+            {
+                FolderId = folder.FolderId;
+            }
+            else
+            {
+                FolderId = -1;
+                _message = "Folder Path " + Folder + "Does Not Exist";
+                _messagetype = MessageType.Error;
+            }
+        }
 
-		if (FileId != -1)
-		{
-			File file = await FileService.GetFileAsync(FileId);
-			if (file != null)
-			{
-				FolderId = file.FolderId;
-				await OnSelect.InvokeAsync(FileId);
-			}
-			else
-			{
-				FileId = -1; // file does not exist
-				_message = "FileId " + FileId.ToString() + "Does Not Exist";
-				_messagetype = MessageType.Error;
-			}
-		}
+        if (ShowFolders)
+        {
+            _folders = await FolderService.GetFoldersAsync(ModuleState.SiteId);
+        }
+        else
+        {
+            if (FolderId != -1)
+            {
+                var folder = await FolderService.GetFolderAsync(FolderId);
+                if (folder != null)
+                {
+                    _folders = new List<Folder> { folder };
+                }
+            }
+        }
 
-		await SetImage();
+        if (FileId != -1)
+        {
+            File file = await FileService.GetFileAsync(FileId);
+            if (file != null)
+            {
+                FolderId = file.FolderId;
+            }
+            else
+            {
+                FileId = -1; // file does not exist
+                _message = "FileId " + FileId.ToString() + "Does Not Exist";
+                _messagetype = MessageType.Error;
+            }
+        }
 
-		if (!string.IsNullOrEmpty(Filter))
-		{
-			_filter = "." + Filter.Replace(",", ",.");
-		}
+        await SetImage();
 
-		await GetFiles();
+        if (!string.IsNullOrEmpty(Filter))
+        {
+            _filter = "." + Filter.Replace(",", ",.");
+        }
 
-		// create unique id for component
-		_guid = Guid.NewGuid().ToString("N");
-		_fileinputid = "FileInput_" + _guid;
-		_progressinfoid = "ProgressInfo_" + _guid;
-		_progressbarid = "ProgressBar_" + _guid;
-	}
+        await GetFiles();
 
-	private async Task GetFiles()
-	{
-		_haseditpermission = false;
-		if (Folder == Constants.PackagesFolder)
-		{
-			_haseditpermission = UserSecurity.IsAuthorized(PageState.User, RoleNames.Host);
-			_files = new List<File>();
-		}
-		else
-		{
-			Folder folder = _folders.FirstOrDefault(item => item.FolderId == FolderId);
-			if (folder != null)
-			{
-				_haseditpermission = UserSecurity.IsAuthorized(PageState.User, PermissionNames.Edit, folder.Permissions);
-				_files = await FileService.GetFilesAsync(FolderId);
-			}
-			else
-			{
-				_haseditpermission = false;
-				_files = new List<File>();
-			}
-		}
-		if (_filter != "*")
-		{
-			List<File> filtered = new List<File>();
-			foreach (File file in _files)
-			{
-				if (_filter.ToUpper().IndexOf("." + file.Extension.ToUpper()) != -1)
-				{
-					filtered.Add(file);
-				}
-			}
-			_files = filtered;
-		}
-	}
+        _initialized = true;
+    }
 
-	private async Task FolderChanged(ChangeEventArgs e)
-	{
-		_message = string.Empty;
-		try
-		{
-			FolderId = int.Parse((string)e.Value);
-			await GetFiles();
-			FileId = -1;
-			_file = null;
-			_image = string.Empty;
-			StateHasChanged();
-		}
-		catch (Exception ex)
-		{
-			await logger.LogError(ex, "Error Loading Files {Error}", ex.Message);
-			_message = Localizer["Error.File.Load"];
-			_messagetype = MessageType.Error;
-		}
-	}
+    private async Task GetFiles()
+    {
+        _haseditpermission = false;
+        if (Folder == Constants.PackagesFolder)
+        {
+            _haseditpermission = UserSecurity.IsAuthorized(PageState.User, RoleNames.Host);
+            _files = new List<File>();
+        }
+        else
+        {
+            Folder folder = _folders.FirstOrDefault(item => item.FolderId == FolderId);
+            if (folder != null)
+            {
+                _haseditpermission = UserSecurity.IsAuthorized(PageState.User, PermissionNames.Edit, folder.PermissionList);
+                if (UserSecurity.IsAuthorized(PageState.User, PermissionNames.Browse, folder.PermissionList))
+                {
+                    _files = await FileService.GetFilesAsync(FolderId);
+                }
+                else
+                {
+                    _files = new List<File>();
+                }
+            }
+            else
+            {
+                _haseditpermission = false;
+                _files = new List<File>();
+            }
+            if (_filter != "*")
+            {
+                List<File> filtered = new List<File>();
+                foreach (File file in _files)
+                {
+                    if (_filter.ToUpper().IndexOf("." + file.Extension.ToUpper()) != -1)
+                    {
+                        filtered.Add(file);
+                    }
+                }
+                _files = filtered;
+            }
+        }
+    }
 
-	private async Task FileChanged(ChangeEventArgs e)
-	{
-		_message = string.Empty;
-		FileId = int.Parse((string)e.Value);
-		if (FileId != -1)
-		{
-			await OnSelect.InvokeAsync(FileId);
-		}
+    private async Task FolderChanged(ChangeEventArgs e)
+    {
+        _message = string.Empty;
+        try
+        {
+            FolderId = int.Parse((string)e.Value);
+            await GetFiles();
+            FileId = -1;
+            _file = null;
+            _image = string.Empty;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading Files {Error}", ex.Message);
+            _message = Localizer["Error.File.Load"];
+            _messagetype = MessageType.Error;
+        }
+    }
 
-		await SetImage();
-		StateHasChanged();
-	}
+    private async Task FileChanged(ChangeEventArgs e)
+    {
+        _message = string.Empty;
+        FileId = int.Parse((string)e.Value);
+        await SetImage();
+        await OnSelect.InvokeAsync(FileId);
+        StateHasChanged();
 
-	private async Task SetImage()
-	{
-		_image = string.Empty;
-		_file = null;
-		if (FileId != -1)
-		{
-			_file = await FileService.GetFileAsync(FileId);
-			if (_file != null && ShowImage && _file.ImageHeight != 0 && _file.ImageWidth != 0)
-			{
-				var maxwidth = 200;
-				var maxheight = 200;
+    }
 
-				var ratioX = (double)maxwidth / (double)_file.ImageWidth;
-				var ratioY = (double)maxheight / (double)_file.ImageHeight;
-				var ratio = ratioX < ratioY ? ratioX : ratioY;
+    private async Task SetImage()
+    {
+        _image = string.Empty;
+        _file = null;
+        if (FileId != -1)
+        {
+            _file = await FileService.GetFileAsync(FileId);
+            if (_file != null && ShowImage && _file.ImageHeight != 0 && _file.ImageWidth != 0)
+            {
+                var maxwidth = 200;
+                var maxheight = 200;
 
-				_image = "<img src=\"" + _file.Url + "\" alt=\"" + _file.Name +
-							"\" width=\"" + Convert.ToInt32(_file.ImageWidth * ratio).ToString() +
-							"\" height=\"" + Convert.ToInt32(_file.ImageHeight * ratio).ToString() + "\" />";
-			}
-		}
-	}
+                var ratioX = (double)maxwidth / (double)_file.ImageWidth;
+                var ratioY = (double)maxheight / (double)_file.ImageHeight;
+                var ratio = ratioX < ratioY ? ratioX : ratioY;
 
-	private async Task UploadFiles()
-	{
-		_message = string.Empty;
-		var interop = new Interop(JSRuntime);
-		var uploads = await interop.GetFiles(_fileinputid);
-		if (uploads.Length > 0)
-		{
-			string restricted = "";
-			foreach (var upload in uploads)
-			{
-				var extension = (upload.LastIndexOf(".") != -1) ? upload.Substring(upload.LastIndexOf(".") + 1) : "";
-				if (!Constants.UploadableFiles.Split(',').Contains(extension.ToLower()))
-				{
-					restricted += (restricted == "" ? "" : ",") + extension;
-				}
-			}
-			if (restricted == "")
-			{
-				try
-				{
-					// upload the files
-					var posturl = Utilities.TenantUrl(PageState.Alias, "/api/file/upload");
-					var folder = (Folder == Constants.PackagesFolder) ? Folder : FolderId.ToString();
-					await interop.UploadFiles(posturl, folder, _guid, SiteState.AntiForgeryToken);
+                _image = "<img src=\"" + _file.Url + "\" alt=\"" + _file.Name +
+                            "\" width=\"" + Convert.ToInt32(_file.ImageWidth * ratio).ToString() +
+                            "\" height=\"" + Convert.ToInt32(_file.ImageHeight * ratio).ToString() + "\" />";
+            }
+        }
+    }
 
-					// uploading is asynchronous so we need to wait for the uploads to complete
-					// note that this will only wait a maximum of 15 seconds which may not be long enough for very large file uploads
-					bool success = false;
-					int attempts = 0;
-					while (attempts < 5 && !success)
-					{
-						attempts += 1;
-						Thread.Sleep(1000 * attempts); // progressive retry 
+    private async Task UploadFiles()
+    {
+        _message = string.Empty;
+        var interop = new Interop(JSRuntime);
+        var uploads = await interop.GetFiles(_fileinputid);
+        if (uploads.Length > 0)
+        {
+            string restricted = "";
+            foreach (var upload in uploads)
+            {
+                var filename = upload.Split(':')[0];
+                var extension = (filename.LastIndexOf(".") != -1) ? filename.Substring(filename.LastIndexOf(".") + 1) : "";
+                if (!Constants.UploadableFiles.Split(',').Contains(extension.ToLower()))
+                {
+                    restricted += (restricted == "" ? "" : ",") + extension;
+                }
+            }
+            if (restricted == "")
+            {
+                if (!ShowProgress)
+                {
+                    _uploading = true;
+                    StateHasChanged();
+                }
 
-						success = true;
-						List<File> files = await FileService.GetFilesAsync(folder);
-						if (files.Count > 0)
-						{
-							foreach (string upload in uploads)
-							{
-								if (!files.Exists(item => item.Name == upload))
-								{
-									success = false;
-								}
-							}
-						}
-					}
+                try
+                {
+                    // upload the files
+                    var posturl = Utilities.TenantUrl(PageState.Alias, "/api/file/upload");
+                    var folder = (Folder == Constants.PackagesFolder) ? Folder : FolderId.ToString();
+                    await interop.UploadFiles(posturl, folder, _guid, SiteState.AntiForgeryToken);
 
-					// reset progress indicators
-					await interop.SetElementAttribute(_guid + "ProgressInfo", "style", "display: none;");
-					await interop.SetElementAttribute(_guid + "ProgressBar", "style", "display: none;");
+                    // uploading is asynchronous so we need to poll to determine if uploads are completed
+                    var success = true;
+                    int upload = 0;
+                    while (upload < uploads.Length && success)
+                    {
+                        success = false;
+                        var filename = uploads[upload].Split(':')[0];
 
-					if (success)
-					{
-						await logger.LogInformation("File Upload Succeeded {Files}", uploads);
-						if (ShowSuccess)
-						{
-							_message = Localizer["Success.File.Upload"];
-							_messagetype = MessageType.Success;
-						}
-					}
-					else
-					{
-						await logger.LogInformation("File Upload Failed Or Is Still In Progress {Files}", uploads);
-						_message = Localizer["Error.File.Upload"];
-						_messagetype = MessageType.Error;
-					}
+                        var size = Int64.Parse(uploads[upload].Split(':')[1]); // bytes
+                        var megabits = (size / 1048576.0) * 8; // binary conversion
+                        var uploadspeed = 2; // 2 Mbps (3G ranges from 300Kbps to 3Mbps)
+                        var uploadtime = (megabits / uploadspeed); // seconds
+                        var maxattempts = 5; // polling (minimum timeout duration will be 5 seconds)
+                        var sleep = (int)Math.Ceiling(uploadtime / maxattempts) * 1000; // milliseconds
 
-					// set FileId to first file in upload collection
-					await GetFiles();
-					var file = _files.Where(item => item.Name == uploads[0]).FirstOrDefault();
-					if (file != null)
-					{
-						FileId = file.FileId;
-						await SetImage();
-						await OnUpload.InvokeAsync(FileId);
-					}
-					StateHasChanged();
-				}
-				catch (Exception ex)
-				{
-					await logger.LogError(ex, "File Upload Failed {Error}", ex.Message);
-					_message = Localizer["Error.File.Upload"];
-					_messagetype = MessageType.Error;
-				}
-			}
-			else
-			{
-				_message = string.Format(Localizer["Message.File.Restricted"], restricted);
-				_messagetype = MessageType.Warning;
-			}
-		}
-		else
-		{
-			_message = Localizer["Message.File.NotSelected"];
-			_messagetype = MessageType.Warning;
-		}
-	}
+                        int attempts = 0;
+                        while (attempts < maxattempts && !success)
+                        {
+                            attempts += 1;
+                            Thread.Sleep(sleep);
 
-	private async Task DeleteFile()
-	{
-		_message = string.Empty;
-		try
-		{
-			await FileService.DeleteFileAsync(FileId);
-			await logger.LogInformation("File Deleted {File}", FileId);
-			await OnDelete.InvokeAsync(FileId);
+                            if (Folder == Constants.PackagesFolder)
+                            {
+                                var files = await FileService.GetFilesAsync(folder);
+                                if (files != null && files.Any(item => item.Name == filename))
+                                {
+                                    success = true;
+                                }
+                            }
+                            else
+                            {
+                                var file = await FileService.GetFileAsync(int.Parse(folder), filename);
+                                if (file != null)
+                                {
+                                    success = true;
+                                }
+                            }
+                        }
+                        if (success)
+                        {
+                            upload++;
+                        }
+                    }
 
-			_message = Localizer["Success.File.Delete"];
-			_messagetype = MessageType.Success;
+                    // reset progress indicators
+                    if (ShowProgress)
+                    {
+                        await interop.SetElementAttribute(_progressinfoid, "style", "display: none;");
+                        await interop.SetElementAttribute(_progressbarid, "style", "display: none;");
+                    }
+                    else
+                    {
+                        _uploading = false;
+                        StateHasChanged();
+                    }
+
+                    if (success)
+                    {
+                        await logger.LogInformation("File Upload Succeeded {Files}", uploads);
+                        if (ShowSuccess)
+                        {
+                            _message = Localizer["Success.File.Upload"];
+                            _messagetype = MessageType.Success;
+                        }
+                    }
+                    else
+                    {
+                        await logger.LogInformation("File Upload Failed Or Is Still In Progress {Files}", uploads);
+                        _message = Localizer["Error.File.Upload"];
+                        _messagetype = MessageType.Error;
+                    }
+
+                    if (Folder == Constants.PackagesFolder)
+                    {
+                        await OnUpload.InvokeAsync(-1);
+                    }
+                    else
+                    {
+                        // set FileId to first file in upload collection
+                        var file = await FileService.GetFileAsync(int.Parse(folder), uploads[0].Split(":")[0]);
+                        if (file != null)
+                        {
+                            FileId = file.FileId;
+                            await SetImage();
+                            await OnSelect.InvokeAsync(FileId);
+                            await OnUpload.InvokeAsync(FileId);
+                        }
+                        await GetFiles();
+                        StateHasChanged();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await logger.LogError(ex, "File Upload Failed {Error}", ex.Message);
+                    _message = Localizer["Error.File.Upload"];
+                    _messagetype = MessageType.Error;
+                    _uploading = false;
+                }
+
+            }
+            else
+            {
+                _message = string.Format(Localizer["Message.File.Restricted"], restricted);
+                _messagetype = MessageType.Warning;
+            }
+        }
+        else
+        {
+            _message = Localizer["Message.File.NotSelected"];
+            _messagetype = MessageType.Warning;
+        }
+    }
+
+    private async Task DeleteFile()
+    {
+        _message = string.Empty;
+        try
+        {
+            await FileService.DeleteFileAsync(FileId);
+            await logger.LogInformation("File Deleted {File}", FileId);
+            await OnDelete.InvokeAsync(FileId);
+
+            if (ShowSuccess)
+            {
+                _message = Localizer["Success.File.Delete"];
+                _messagetype = MessageType.Success;
+            }
 
 			await GetFiles();
 			FileId = -1;
 			await SetImage();
-			StateHasChanged();
+            await OnSelect.InvokeAsync(FileId);
+            StateHasChanged();
 		}
 		catch (Exception ex)
 		{

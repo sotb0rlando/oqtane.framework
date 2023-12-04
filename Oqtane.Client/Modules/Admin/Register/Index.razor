@@ -1,9 +1,11 @@
 @namespace Oqtane.Modules.Admin.Register
+@using System.Net
 @inherits ModuleBase
 @inject NavigationManager NavigationManager
 @inject IUserService UserService
 @inject IStringLocalizer<Index> Localizer
 @inject IStringLocalizer<SharedResources> SharedLocalizer
+@inject ISettingService SettingService
 
 @if (PageState.Site.AllowRegistration)
 {
@@ -15,7 +17,7 @@
             <ModuleMessage Message="@Localizer["Info.Registration.Exists"]" Type="MessageType.Info" />
         </Authorized>
         <NotAuthorized>
-            <ModuleMessage Message="@Localizer["Info.Registration.InvalidEmail"]" Type="MessageType.Info" />
+            <ModuleMessage Message="@_passwordrequirements" Type="MessageType.Info" />
             <form @ref="form" class="@(validated ? "was-validated" : "needs-validation")" novalidate>
                 <div class="container">
                     <div class="row mb-1 align-items-center">
@@ -29,7 +31,7 @@
                         <div class="col-sm-9">
 							<div class="input-group">
 								<input id="password" type="@_passwordtype" class="form-control" @bind="@_password" autocomplete="new-password" required />
-								<button type="button" class="btn btn-secondary" @onclick="@TogglePassword">@_togglepassword</button>
+                                <button type="button" class="btn btn-secondary" @onclick="@TogglePassword" tabindex="-1">@_togglepassword</button>
 							</div>
                         </div>
                     </div>
@@ -38,7 +40,7 @@
                         <div class="col-sm-9">
 							<div class="input-group">
 								<input id="confirm" type="@_passwordtype" class="form-control" @bind="@_confirm" autocomplete="new-password" required />
-								<button type="button" class="btn btn-secondary" @onclick="@TogglePassword">@_togglepassword</button>
+                                <button type="button" class="btn btn-secondary" @onclick="@TogglePassword" tabindex="-1">@_togglepassword</button>
 							</div>
                         </div>
                     </div>
@@ -68,22 +70,28 @@ else
 }
 
 @code {
-	private string _username = string.Empty;
-	private ElementReference form;
-	private bool validated = false;
-	private string _password = string.Empty;
-	private string _passwordtype = "password";
-	private string _togglepassword = string.Empty;
-	private string _confirm = string.Empty;
-	private string _email = string.Empty;
-	private string _displayname = string.Empty;
+    private string _passwordrequirements;
+    private string _username = string.Empty;
+    private ElementReference form;
+    private bool validated = false;
+    private string _password = string.Empty;
+    private string _passwordtype = "password";
+    private string _togglepassword = string.Empty;
+    private string _confirm = string.Empty;
+    private string _email = string.Empty;
+    private string _displayname = string.Empty;
 
-	public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Anonymous;
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Anonymous;
 
-	protected override void OnParametersSet()
-	{
-		_togglepassword = SharedLocalizer["ShowPassword"];
-	}
+    protected override async Task OnInitializedAsync()
+    {
+        _passwordrequirements = await UserService.GetPasswordRequirementsAsync(PageState.Site.SiteId);
+    }
+
+    protected override void OnParametersSet()
+    {
+        _togglepassword = SharedLocalizer["ShowPassword"];     
+    }
 
     private async Task Register()
     {
@@ -113,7 +121,14 @@ else
                         if (user != null)
                         {
                             await logger.LogInformation("User Created {Username} {Email}", _username, _email);
-                            AddModuleMessage(Localizer["Info.User.AccountCreate"], MessageType.Info);
+                            if (PageState.QueryString.ContainsKey("returnurl"))
+                            {
+                                NavigationManager.NavigateTo(WebUtility.UrlDecode(PageState.QueryString["returnurl"]));
+                            }
+                            else // legacy behavior
+                            {
+                                AddModuleMessage(Localizer["Info.User.AccountCreate"], MessageType.Info);
+                            }
                         }
                         else
                         {

@@ -24,6 +24,7 @@ namespace Oqtane.Models
             Query = uri.Query;
             Fragment = uri.Fragment;
             AbsolutePath = uri.AbsolutePath;
+            PathAndQuery = uri.PathAndQuery;
             AliasPath = aliaspath;
             PagePath = AbsolutePath;
             ModuleId = "";
@@ -91,6 +92,11 @@ namespace Oqtane.Models
         public string AbsolutePath { get; set; }
 
         /// <summary>
+        /// The absolute path for the route including the querystring
+        /// </summary>
+        public string PathAndQuery { get; set; }
+
+        /// <summary>
         /// An absolute path may contain an alias path
         /// </summary>
         public string AliasPath { get; set; }
@@ -116,7 +122,7 @@ namespace Oqtane.Models
         public string UrlParameters { get; set; }
 
         /// <summary>
-        /// A route may contain querystring parameters located after the ? delimiter
+        /// All querystring parameters (prefixed with a ? delimiter)
         /// </summary>
         public string Query { get; set; }
 

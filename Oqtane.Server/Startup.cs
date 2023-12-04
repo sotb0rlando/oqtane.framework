@@ -16,6 +16,7 @@ using Oqtane.Repository;
 using Oqtane.Security;
 using Oqtane.Shared;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Logging;
 
 namespace Oqtane
 {
@@ -24,6 +25,7 @@ namespace Oqtane
         private readonly bool _useSwagger;
         private readonly IWebHostEnvironment _env;
         private readonly string[] _installedCultures;
+        private string _configureServicesErrors;
 
         public IConfigurationRoot Configuration { get; }
 
@@ -31,8 +33,9 @@ namespace Oqtane
         {
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true);
+                .AddJsonFile("appsettings.json", false, true)
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true)
+                .AddEnvironmentVariables();
             Configuration = builder.Build();
 
             _installedCultures = localizationManager.GetInstalledCultures();
@@ -40,7 +43,7 @@ namespace Oqtane
             //add possibility to switch off swagger on production.
             _useSwagger = Configuration.GetSection("UseSwagger").Value != "false";
 
-            AppDomain.CurrentDomain.SetData("DataDirectory", Path.Combine(env.ContentRootPath, "Data"));
+            AppDomain.CurrentDomain.SetData(Constants.DataDirectory, Path.Combine(env.ContentRootPath, "Data"));
 
             _env = env;
         }
@@ -68,6 +71,9 @@ namespace Oqtane
                     {
                         options.DetailedErrors = true;
                     }
+                })
+                .AddHubOptions(options => {
+                    options.MaximumReceiveMessageSize = null; // no limit (for large amnounts of data ie. textarea components)
                 });
 
             // setup HttpClient for server side in a client side compatible fashion ( with auth cookie )
@@ -85,7 +91,7 @@ namespace Oqtane
                 .AddOqtaneSingletonServices();
 
             // install any modules or themes ( this needs to occur BEFORE the assemblies are loaded into the app domain )
-            InstallationManager.InstallPackages(_env.WebRootPath, _env.ContentRootPath);
+            _configureServicesErrors += InstallationManager.InstallPackages(_env.WebRootPath, _env.ContentRootPath);
 
             // register transient scoped core services
             services.AddOqtaneTransientServices();
@@ -111,14 +117,12 @@ namespace Oqtane
             services.ConfigureOqtaneIdentityOptions(Configuration);
 
             services.AddAuthentication(options =>
-                {
-                    options.DefaultAuthenticateScheme = Constants.AuthenticationScheme;
-                    options.DefaultChallengeScheme = Constants.AuthenticationScheme;
-                    options.DefaultSignOutScheme = Constants.AuthenticationScheme;
-                })
-                .AddCookie(Constants.AuthenticationScheme)
-                .AddOpenIdConnect(AuthenticationProviderTypes.OpenIDConnect, options => { })
-                .AddOAuth(AuthenticationProviderTypes.OAuth2, options => { });
+            {
+                options.DefaultScheme = Constants.AuthenticationScheme;
+            })
+            .AddCookie(Constants.AuthenticationScheme)
+            .AddOpenIdConnect(AuthenticationProviderTypes.OpenIDConnect, options => { })
+            .AddOAuth(AuthenticationProviderTypes.OAuth2, options => { });
 
             services.ConfigureOqtaneCookieOptions();
             services.ConfigureOqtaneAuthenticationOptions(Configuration);
@@ -142,8 +146,13 @@ namespace Oqtane
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ISyncManager sync)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ISyncManager sync, ILogger<Startup> logger)
         {
+            if (!string.IsNullOrEmpty(_configureServicesErrors))
+            {
+                logger.LogError(_configureServicesErrors);
+            }
+
             ServiceActivator.Configure(app.ApplicationServices);
 
             if (env.IsDevelopment())

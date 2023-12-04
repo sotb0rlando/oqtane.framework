@@ -4,31 +4,32 @@
 
 @if (_visible)
 {
-	<CascadingValue Value="@ModuleState">
+    <a id="@ModuleState.PageModuleId.ToString()"></a>
+    <CascadingValue Value="@ModuleState">
 		@if (_useadminborder)
 		{
 			<div class="app-pane-admin-border">
-				@DynamicComponent
+                <DynamicComponent Type="@ComponentType"></DynamicComponent>
 			</div>
 		}
 		else
 		{
-			@DynamicComponent
+		    <DynamicComponent Type="@ComponentType"></DynamicComponent>
 		}
 	</CascadingValue>
+    
 }
 
 @code {
 	private bool _visible = true;
 	private bool _useadminborder = false;
+    public Type ComponentType { get; set; }
 
     [CascadingParameter]
     protected PageState PageState { get; set; }
 
     [Parameter]
     public Module ModuleState { get; set; }
-
-    RenderFragment DynamicComponent { get; set; }
 
 	protected override void OnInitialized()
 	{
@@ -38,12 +39,12 @@
 	protected override void OnParametersSet()
     {
         string container = ModuleState.ContainerType;
-        if (PageState.ModuleId != -1 && ModuleState.UseAdminContainer)
+        if (PageState.ModuleId != -1 && PageState.Route.Action != "" && ModuleState.UseAdminContainer)
         {
             container = (!string.IsNullOrEmpty(PageState.Site.AdminContainerType)) ? PageState.Site.AdminContainerType : Constants.DefaultAdminContainer;
         }
 
-        if (PageState.EditMode && UserSecurity.IsAuthorized(PageState.User, PermissionNames.Edit, PageState.Page.Permissions) && PageState.Action == Constants.DefaultAction)
+        if (PageState.EditMode && UserSecurity.IsAuthorized(PageState.User, PermissionNames.Edit, PageState.Page.PermissionList) && PageState.Action == Constants.DefaultAction)
         {
             _useadminborder = true;
         }
@@ -52,17 +53,7 @@
             _useadminborder = false;
         }
 
-        DynamicComponent = builder =>
-        {
-            Type containerType = Type.GetType(container);
-            if (containerType == null)
-            {
-                // fallback
-                containerType = Type.GetType(Constants.DefaultContainer);
-            }
-            builder.OpenComponent(0, containerType);
-            builder.CloseComponent();
-        };
+        ComponentType = Type.GetType(container) ?? Type.GetType(Constants.DefaultContainer);
     }
 
 	private void PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -81,4 +72,6 @@
 	{
 		((INotifyPropertyChanged)SiteState.Properties).PropertyChanged -= PropertyChanged;
 	}
+
+
 }

@@ -132,7 +132,7 @@ namespace Oqtane.Shared
             var url = (alias != null && !string.IsNullOrEmpty(alias.Path)) ? "/" + alias.Path : "";
             mode = string.IsNullOrEmpty(mode) ? "crop" : mode;
             position = string.IsNullOrEmpty(position) ? "center" : position;
-            background = string.IsNullOrEmpty(background) ? "000000" : background;
+            background = string.IsNullOrEmpty(background) ? "transparent" : background;
             return $"{alias?.BaseUrl}{url}{Constants.ImageUrl}{fileId}/{width}/{height}/{mode}/{position}/{background}/{rotate}/{recreate}";
         }
 
@@ -141,6 +141,16 @@ namespace Oqtane.Shared
             url = (!url.StartsWith("/")) ? "/" + url : url;
             url = (alias != null && !string.IsNullOrEmpty(alias.Path)) ? "/" + alias.Path + url : url;
             return $"{alias?.BaseUrl}{url}";
+        }
+
+        public static string AddUrlParameters(params object[] parameters)
+        {
+            var url = "";
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                url += "/" + parameters[i].ToString();
+            }
+            return url;
         }
 
         public static string FormatContent(string content, Alias alias, string operation)
@@ -377,13 +387,20 @@ namespace Oqtane.Shared
         }
 
         public static string UrlCombine(params string[] segments)
-{
-            segments = segments.Where(item => !string.IsNullOrEmpty(item) && item != "/" && item != "\\").ToArray();
-            for (int i = 1; i < segments.Length; i++)
+        {
+            var url = new List<string>();
+            for (int i = 0; i < segments.Length; i++)
             {
                 segments[i] = segments[i].Replace("\\", "/");
+                if (!string.IsNullOrEmpty(segments[i]) && segments[i] != "/")
+                {
+                    foreach (var segment in segments[i].Split('/', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        url.Add(segment);
+                    }
+                }
             }
-            return string.Join("/", segments);
+            return string.Join("/", url);
         }
 
         public static bool IsPathValid(this Folder folder)
@@ -428,28 +445,50 @@ namespace Oqtane.Shared
 
         public static Dictionary<string, string> ParseQueryString(string query)
         {
-            Dictionary<string, string> dictionary = new Dictionary<string, string>();
+            Dictionary<string, string> querystring = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // case insensistive keys
             if (!string.IsNullOrEmpty(query))
             {
-                query = query.Substring(1);
-                string str = query;
-                char[] separator = new char[1] { '&' };
-                foreach (string key in str.Split(separator, StringSplitOptions.RemoveEmptyEntries))
+                if (query.StartsWith("?"))
                 {
-                    if (key != "")
+                    query = query.Substring(1); // ignore "?"
+                }
+                foreach (string kvp in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (kvp != "")
                     {
-                        if (key.Contains("="))
+                        if (kvp.Contains("="))
                         {
-                            string[] strArray = key.Split('=', StringSplitOptions.None);
-                            dictionary.Add(strArray[0], strArray[1]);
+                            string[] pair = kvp.Split('=');
+                            if (!querystring.ContainsKey(pair[0]))
+                            {
+                                querystring.Add(pair[0], pair[1]);
+                            }
                         }
                         else
-                            dictionary.Add(key, "true");
+                        {
+                            if (!querystring.ContainsKey(kvp))
+                            {
+                                querystring.Add(kvp, "true"); // default parameter when no value is provided
+                            }
+                        }
                     }
                 }
             }
+            return querystring;
+        }
 
-            return dictionary;
+        public static string CreateQueryString(Dictionary<string, string> parameters)
+        {
+            var querystring = "";
+            if (parameters.Count > 0)
+            {
+                foreach (var kvp in parameters)
+                {
+                    querystring += (querystring == "") ? "?" : "&";
+                    querystring += kvp.Key + "=" + kvp.Value;
+                }
+            }
+            return querystring;
         }
 
         public static string LogMessage(object @class, string message)
@@ -459,16 +498,49 @@ namespace Oqtane.Shared
 
         public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, string time, TimeZoneInfo localTimeZone = null)
         {
-            localTimeZone ??= TimeZoneInfo.Local;
-            if (date != null)
+            if (date != null && !string.IsNullOrEmpty(time) && TimeSpan.TryParse(time, out TimeSpan timespan))
             {
-                if (!string.IsNullOrEmpty(time))
-                {
-                    return TimeZoneInfo.ConvertTime(DateTime.Parse(date.Value.Date.ToShortDateString() + " " + time), localTimeZone, TimeZoneInfo.Utc);
-                }
-                return TimeZoneInfo.ConvertTime(date.Value.Date, localTimeZone, TimeZoneInfo.Utc);
+                return LocalDateAndTimeAsUtc(date.Value.Date.Add(timespan), localTimeZone);
             }
             return null;
+        }
+
+        public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, DateTime? time, TimeZoneInfo localTimeZone = null)
+        {
+            if (date != null)
+            {
+                if (time != null)
+                {
+                    return LocalDateAndTimeAsUtc(date.Value.Date.Add(time.Value.TimeOfDay), localTimeZone);
+                }
+                return LocalDateAndTimeAsUtc(date.Value.Date, localTimeZone);
+            }
+            return null;
+        }
+
+        public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, TimeZoneInfo localTimeZone = null)
+        {
+            if (date != null)
+            {
+                localTimeZone ??= TimeZoneInfo.Local;
+                return TimeZoneInfo.ConvertTime(date.Value, localTimeZone, TimeZoneInfo.Utc);
+            }
+            return null;
+        }
+
+        public static DateTime? UtcAsLocalDate(DateTime? dateTime, TimeZoneInfo timeZone = null)
+        {
+            return UtcAsLocalDateAndTime(dateTime, timeZone).date;
+        }
+
+        public static DateTime? UtcAsLocalDateTime(DateTime? dateTime, TimeZoneInfo timeZone = null)
+        {
+            var result = UtcAsLocalDateAndTime(dateTime, timeZone);
+            if (result.date != null && !string.IsNullOrEmpty(result.time) && TimeSpan.TryParse(result.time, out TimeSpan timespan))
+            {
+                result.date = result.date.Value.Add(timespan);
+            }
+            return result.date;
         }
 
         public static (DateTime? date, string time) UtcAsLocalDateAndTime(DateTime? dateTime, TimeZoneInfo timeZone = null)

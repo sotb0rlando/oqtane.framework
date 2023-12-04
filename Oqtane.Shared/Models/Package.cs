@@ -33,6 +33,16 @@ namespace Oqtane.Models
         public string Description { get; set; }
 
         /// <summary>
+        /// logo file id
+        /// </summary>
+        public int? LogoFileId { get; set; }
+
+        /// <summary>
+        /// logo url
+        /// </summary>
+        public string LogoUrl { get; set; }
+
+        /// <summary>
         /// License for the Package. 
         /// </summary>
         public string License { get; set; }
@@ -61,6 +71,11 @@ namespace Oqtane.Models
         /// The direct Url for downloading the package 
         /// </summary>
         public string PackageUrl { get; set; }
+
+        /// <summary>
+        /// The direct Url for getting support for the product
+        /// </summary>
+        public string SupportUrl { get; set; }
 
         /// <summary>
         /// Indicates if any known security vulnerabilities exist 

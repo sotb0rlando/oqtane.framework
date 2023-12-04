@@ -29,7 +29,7 @@ else
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="alias" HelpText="Enter the aliases for the site. An alias can be a domain name (www.site.com) or a virtual folder (ie. www.site.com/folder)." ResourceKey="Aliases">Aliases: </Label>
+                <Label Class="col-sm-3" For="alias" HelpText="The urls for the site (comman delimited). This can include domain names (ie. domain.com), subdomains (ie. sub.domain.com) or virtual folders (ie. domain.com/folder)." ResourceKey="Aliases">Urls: </Label>
                 <div class="col-sm-9">
                     <textarea id="alias" class="form-control" @bind="@_urls" rows="3" required></textarea>
                 </div>
@@ -37,7 +37,7 @@ else
             <div class="row mb-1 align-items-center">
                 <Label Class="col-sm-3" For="defaultTheme" HelpText="Select the default theme for the website" ResourceKey="DefaultTheme">Default Theme: </Label>
                 <div class="col-sm-9">
-                    <select id="defaultTheme" class="form-select" @onchange="(e => ThemeChanged(e))" required>
+                    <select id="defaultTheme" class="form-select" value="@_themetype" @onchange="(e => ThemeChanged(e))" required>
                         <option value="-">&lt;@Localizer["Theme.Select"]&gt;</option>
                         @foreach (var theme in _themes)
                         {
@@ -51,19 +51,6 @@ else
                 <div class="col-sm-9">
                     <select id="defaultContainer" class="form-select" @bind="@_containertype" required>
                         <option value="-">&lt;@Localizer["Container.Select"]&gt;</option>
-                        @foreach (var container in _containers)
-                        {
-                            <option value="@container.TypeName">@container.Name</option>
-                        }
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="adminContainer" HelpText="Select the admin container for the site" ResourceKey="AdminContainer">Admin Container: </Label>
-                <div class="col-sm-9">
-                    <select id="adminContainer" class="form-select" @bind="@_admincontainertype" required>
-                        <option value="-">&lt;@Localizer["Container.Select"]&gt;</option>
-                        <option value="">&lt;@Localizer["DefaultContainer.Admin"]&gt;</option>
                         @foreach (var container in _containers)
                         {
                             <option value="@container.TypeName">@container.Name</option>
@@ -89,7 +76,6 @@ else
                     <select id="runtime" class="form-select" @bind="@_runtime" required>
                         <option value="Server">@SharedLocalizer["BlazorServer"]</option>
                         <option value="WebAssembly">@SharedLocalizer["BlazorWebAssembly"]</option>
-						<option value="Hybrid">@SharedLocalizer["BlazorHybrid"]</option>
 					</select>
                 </div>
             </div>
@@ -103,9 +89,9 @@ else
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="tenant" HelpText="Select the tenant for the site" ResourceKey="Tenant">Tenant: </Label>
+                <Label Class="col-sm-3" For="tenant" HelpText="Select the database for the site" ResourceKey="Tenant">Database: </Label>
                 <div class="col-sm-9">
-                    <select id="tenant" class="form-select" @onchange="(e => TenantChanged(e))" required>
+                    <select id="tenant" class="form-select" value="@_tenantid" @onchange="(e => TenantChanged(e))" required>
                         <option value="-">&lt;@Localizer["Tenant.Select"]&gt;</option>
                         <option value="+">&lt;@Localizer["Tenant.Add"]&gt;</option>
                         @foreach (Tenant tenant in _tenants)
@@ -121,13 +107,13 @@ else
                     <hr class="app-rule" />
                 </div>
                 <div class="row mb-1 align-items-center">
-                    <Label Class="col-sm-3" For="name" HelpText="Enter the name for the tenant" ResourceKey="TenantName">Tenant Name: </Label>
+                    <Label Class="col-sm-3" For="name" HelpText="Enter the name for the database" ResourceKey="TenantName">Name: </Label>
                     <div class="col-sm-9">
                         <input id="name" class="form-control" @bind="@_tenantName" maxlength="100" required />
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
-                    <Label Class="col-sm-3" For="databaseType" HelpText="Select the database type for the tenant" ResourceKey="DatabaseType">Database Type: </Label>
+                    <Label Class="col-sm-3" For="databaseType" HelpText="Select the database type" ResourceKey="DatabaseType">Type: </Label>
                     <div class="col-sm-9">
                         @if (_databases != null)
 						{
@@ -160,7 +146,7 @@ else
 				else
 				{
 					<div class="row mb-1 align-items-center">
-						<Label Class="col-sm-3" For="connectionstring" HelpText="Enter a complete connection string including all parameters and delimiters" ResourceKey="ConnectionString">String:</Label>
+						<Label Class="col-sm-3" For="connectionstring" HelpText="Enter a complete connection string including all parameters and delimiters" ResourceKey="ConnectionString">Settings:</Label>
 						<div class="col-sm-9">
 							<textarea id="connectionstring" class="form-control" @bind="@_connectionString" rows="3"></textarea>
 						</div>
@@ -188,46 +174,59 @@ else
 }
 
 @code {
-	private List<Database> _databases;
-	private ElementReference form;
-	private bool validated = false;
-	private string _databaseName;
-	private Type _databaseConfigType;
-	private object _databaseConfig;
-	private RenderFragment DatabaseConfigComponent { get; set; }
-	private bool _showConnectionString = false;
-	private string _connectionString = string.Empty;
+    private List<Database> _databases;
+    private ElementReference form;
+    private bool validated = false;
+    private string _databaseName;
+    private Type _databaseConfigType;
+    private object _databaseConfig;
+    private RenderFragment DatabaseConfigComponent { get; set; }
+    private bool _showConnectionString = false;
+    private string _connectionString = string.Empty;
 
-	private List<Theme> _themeList;
-	private List<ThemeControl> _themes = new List<ThemeControl>();
-	private List<ThemeControl> _containers = new List<ThemeControl>();
-	private List<SiteTemplate> _siteTemplates;
-	private List<Tenant> _tenants;
-	private string _tenantid = "-";
+    private List<Theme> _themeList;
+    private List<ThemeControl> _themes = new List<ThemeControl>();
+    private List<ThemeControl> _containers = new List<ThemeControl>();
+    private List<SiteTemplate> _siteTemplates;
+    private List<Tenant> _tenants;
+    private string _tenantid = "-";
 
-	private string _tenantName = string.Empty;
+    private string _tenantName = string.Empty;
 
-	private string _hostusername = string.Empty;
-	private string _hostpassword = string.Empty;
+    private string _hostusername = string.Empty;
+    private string _hostpassword = string.Empty;
 
-	private string _name = string.Empty;
-	private string _urls = string.Empty;
-	private string _themetype = "-";
-	private string _containertype = "-";
-	private string _admincontainertype = "";
-	private string _sitetemplatetype = "-";
-	private string _runtime = "Server";
-	private string _prerender = "Prerendered";
+    private string _name = string.Empty;
+    private string _urls = string.Empty;
+    private string _themetype = "-";
+    private string _containertype = "-";
+    private string _sitetemplatetype = "-";
+    private string _runtime = "Server";
+    private string _prerender = "Prerendered";
 
-	public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Host;
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Host;
 
-	protected override async Task OnInitializedAsync()
-	{
-		_tenants = await TenantService.GetTenantsAsync();
-		_urls = PageState.Alias.Name;
-		_themeList = await ThemeService.GetThemesAsync();
-		_themes = ThemeService.GetThemeControls(_themeList);
-		_siteTemplates = await SiteTemplateService.GetSiteTemplatesAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _tenants = await TenantService.GetTenantsAsync();
+        if (_tenants.Any(item => item.Name == TenantNames.Master))
+        {
+            _tenantid = _tenants.First(item => item.Name == TenantNames.Master).TenantId.ToString();
+        }
+        _urls = PageState.Alias.Name;
+        _themeList = await ThemeService.GetThemesAsync();
+        _themes = ThemeService.GetThemeControls(_themeList);
+        if (_themes.Any(item => item.TypeName == Constants.DefaultTheme))
+        {
+            _themetype = Constants.DefaultTheme;
+            _containers = ThemeService.GetContainerControls(_themeList, _themetype);
+            _containertype = _containers.First().TypeName;
+        }
+        _siteTemplates = await SiteTemplateService.GetSiteTemplatesAsync();
+        if (_siteTemplates.Any(item => item.TypeName == Constants.DefaultSiteTemplate))
+        {
+            _sitetemplatetype = Constants.DefaultSiteTemplate;
+        }
 
 		_databases = await DatabaseService.GetDatabasesAsync();
 		if (_databases.Exists(item => item.IsDefault))
@@ -288,13 +287,13 @@ else
 			if (_themetype != "-")
 			{
 				_containers = ThemeService.GetContainerControls(_themeList, _themetype);
-			}
+                _containertype = _containers.First().TypeName;
+            }
 			else
 			{
 				_containers = new List<ThemeControl>();
-			}
-			_containertype = "-";
-			_admincontainertype = "";
+                _containertype = "-";
+            }
 			StateHasChanged();
 		}
 		catch (Exception ex)
@@ -315,7 +314,7 @@ else
 				_urls = Regex.Replace(_urls, @"\r\n?|\n", ",");
 				var duplicates = new List<string>();
 				var aliases = await AliasService.GetAliasesAsync();
-				foreach (string name in _urls.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+				foreach (string name in _urls.Split(',', StringSplitOptions.RemoveEmptyEntries))
 				{
 					if (aliases.Exists(item => item.Name == name))
 					{
@@ -329,7 +328,7 @@ else
 
 					if (_tenantid == "+")
 					{
-						if (!string.IsNullOrEmpty(_tenantName) && _tenants.FirstOrDefault(item => item.Name == _tenantName) == null)
+						if (!string.IsNullOrEmpty(_tenantName) && !_tenants.Exists(item => item.Name == _tenantName))
 						{
 							// validate host credentials
 							var user = new User();
@@ -398,7 +397,7 @@ else
                         config.Aliases = _urls;
                         config.DefaultTheme = _themetype;
                         config.DefaultContainer = _containertype;
-                        config.DefaultAdminContainer = _admincontainertype;
+                        config.DefaultAdminContainer = "";
                         config.SiteTemplate = _sitetemplatetype;
                         config.Runtime = _runtime;
                         config.RenderMode = _runtime + _prerender;

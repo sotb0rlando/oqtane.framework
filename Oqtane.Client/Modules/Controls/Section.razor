@@ -1,24 +1,30 @@
 @namespace Oqtane.Modules.Controls
 @inherits LocalizableComponent
 
-<div class="d-flex mt-2">
-    <div>
-        <a data-bs-toggle="collapse" class="app-link-unstyled" href="#@Name" aria-expanded="@_expanded" aria-controls="@Name" @onclick:preventDefault="true">
-            <h5>@_heading</h5>
-        </a>
+@if (IsVisible)
+{
+    <div class="d-flex mt-2">
+        <div>
+            <a data-bs-toggle="collapse" class="app-link-unstyled" href="#@Name" aria-expanded="@_expanded" aria-controls="@Name" @onclick:preventDefault="true">
+                <h5>@_heading</h5>
+            </a>
+        </div>
+        <div class="ms-auto">
+            <a data-bs-toggle="collapse" class="app-link-unstyled float-right" href="#@Name" aria-expanded="@_expanded" aria-controls="@Name" @onclick:preventDefault="true">
+                <i class="oi oi-chevron-bottom"></i>&nbsp;
+            </a>
+        </div>
     </div>
-    <div class="ms-auto">
-        <a data-bs-toggle="collapse" class="app-link-unstyled float-right" href="#@Name" aria-expanded="@_expanded" aria-controls="@Name" @onclick:preventDefault="true">
-            <i class="oi oi-chevron-bottom"></i>&nbsp;
-        </a>
+    <div class="d-flex">
+        <hr class="app-rule" />
     </div>
-</div>
-<div class="d-flex">
-    <hr class="app-rule" />
-</div>
-<div class="collapse @_show" id="@Name">
-    @ChildContent
-</div>
+    <div class="collapse @_show" id="@Name">
+        @if (ChildContent != null)
+        {
+            @ChildContent
+        }
+    </div>
+}
 
 @code {
     private string _heading = string.Empty;
@@ -26,7 +32,7 @@
     private string _show = string.Empty;
 
     [Parameter]
-    public RenderFragment ChildContent { get; set; }
+    public RenderFragment ChildContent { get; set; } = null;
 
     [Parameter]
     public string Name { get; set; } // required - the name of the section
@@ -37,19 +43,15 @@
     [Parameter]
     public string Expanded { get; set; } // optional - will default to false if not provided
 
-    protected override void OnInitialized()
-    {
-        _heading = (!string.IsNullOrEmpty(Heading)) ? Heading : Name;
-        _expanded = (!string.IsNullOrEmpty(Expanded)) ? Expanded : "false";
-        if (_expanded == "true") { _show = "show"; }
-    }
+    [Parameter]
+    public bool IsVisible { get; set; } = true;
 
     protected override void OnParametersSet()
     {
-        base.OnParametersSet();
+        base.OnParametersSet(); // must be included to call method in LocalizableComponent
 
-        _heading = !string.IsNullOrEmpty(Heading)
-            ? Localize(nameof(Heading), Heading)
-            : Localize(nameof(Name), Name);
+        _heading = !string.IsNullOrEmpty(Heading) ? Localize(nameof(Heading), Heading) : Localize(nameof(Name), Name);
+        _expanded = (!string.IsNullOrEmpty(Expanded)) ? Expanded.ToLower() : "false";
+        if (_expanded == "true") { _show = "show"; }
     }
 }

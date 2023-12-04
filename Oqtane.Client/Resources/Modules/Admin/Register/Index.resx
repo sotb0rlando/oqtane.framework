@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -136,7 +136,7 @@
     <value>User Account Created. Please Check Your Email For Verification Instructions.</value>
   </data>
   <data name="Error.User.AddInfo" xml:space="preserve">
-    <value>Error Adding User. Please Ensure Password Meets Complexity Requirements And Username Is Not Already In Use.</value>
+    <value>Error Adding User. Please Ensure Password Meets Complexity Requirements And Username And Email Is Not Already In Use.</value>
   </data>
   <data name="Message.Password.NoMatch" xml:space="preserve">
     <value>Passwords Entered Do Not Match</value>
@@ -166,7 +166,7 @@
     <value>Email:</value>
   </data>
   <data name="Password.HelpText" xml:space="preserve">
-    <value>Please choose a sufficiently secure password and enter it here</value>
+    <value>Please enter a sufficiently secure password which meets the password complexity requirements</value>
   </data>
   <data name="Password.Text" xml:space="preserve">
     <value>Password:</value>

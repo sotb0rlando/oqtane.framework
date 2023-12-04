@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Oqtane.Models;
 using Oqtane.Repository;
 using Oqtane.Shared;
@@ -22,9 +23,6 @@ namespace Oqtane.Infrastructure
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-        // abstract method must be overridden
-        public abstract string ExecuteJob(IServiceProvider provider);
-
         // public properties which can be overridden and are used during auto registration of job
         public string Name { get; set; } = "";
         public string Frequency { get; set; } = "d"; // day
@@ -34,21 +32,38 @@ namespace Oqtane.Infrastructure
         public int RetentionHistory { get; set; } = 10;
         public bool IsEnabled { get; set; } = false;
 
+        // one of the following methods must be overridden
+        public virtual string ExecuteJob(IServiceProvider provider)
+        {
+            return "";
+        }
+
+        public virtual Task<string> ExecuteJobAsync(IServiceProvider provider)
+        {
+            return Task.FromResult(string.Empty);
+        }
+
         protected async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             await Task.Yield(); // required so that this method does not block startup
 
-            try
-            {                
-                while (!stoppingToken.IsCancellationRequested)
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                using (var scope = _serviceScopeFactory.CreateScope())
                 {
-                    using (var scope = _serviceScopeFactory.CreateScope())
+                    ILogger<HostedServiceBase> _filelogger = scope.ServiceProvider.GetRequiredService<ILogger<HostedServiceBase>>();
+
+                    try
                     {
+                        var jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
+                        var jobLogs = scope.ServiceProvider.GetRequiredService<IJobLogRepository>();
+                        var tenantRepository = scope.ServiceProvider.GetRequiredService<ITenantRepository>();
+                        var tenantManager = scope.ServiceProvider.GetRequiredService<ITenantManager>();
+
                         // get name of job
                         string jobType = Utilities.GetFullTypeName(GetType().AssemblyQualifiedName);
 
                         // load jobs and find current job
-                        IJobRepository jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
                         Job job = jobs.GetJobs().Where(item => item.JobType == jobType).FirstOrDefault();
                         if (job != null && job.IsEnabled && !job.IsExecuting)
                         {
@@ -73,7 +88,9 @@ namespace Oqtane.Infrastructure
                             // determine if the job should be run
                             if (NextExecution <= DateTime.UtcNow && (job.EndDate == null || job.EndDate >= DateTime.UtcNow))
                             {
-                                IJobLogRepository jobLogs = scope.ServiceProvider.GetRequiredService<IJobLogRepository>();
+                                // update the job to indicate it is running
+                                job.IsExecuting = true;
+                                jobs.UpdateJob(job);
 
                                 // create a job log entry
                                 JobLog log = new JobLog();
@@ -84,21 +101,16 @@ namespace Oqtane.Infrastructure
                                 log.Notes = "";
                                 log = jobLogs.AddJobLog(log);
 
-                                // update the job to indicate it is running
-                                job.IsExecuting = true;
-                                jobs.UpdateJob(job);
-
                                 // execute the job
                                 try
                                 {
                                     var notes = "";
-                                    var tenantRepository = scope.ServiceProvider.GetRequiredService<ITenantRepository>();
-                                    var tenantManager = scope.ServiceProvider.GetRequiredService<ITenantManager>();
                                     foreach (var tenant in tenantRepository.GetTenants())
                                     {
                                         // set tenant and execute job
                                         tenantManager.SetTenant(tenant.TenantId);
                                         notes += ExecuteJob(scope.ServiceProvider);
+                                        notes += await ExecuteJobAsync(scope.ServiceProvider);
                                     }
                                     log.Notes = notes;
                                     log.Succeeded = true;
@@ -133,16 +145,19 @@ namespace Oqtane.Infrastructure
                             }
                         }
                     }
-
-                    // wait 1 minute
-                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                    catch (Exception ex)
+                    {
+                        // can occur during the initial installation because the database has not yet been created
+                        if (!ex.Message.Contains("No database provider has been configured for this DbContext"))
+                        {
+                            _filelogger.LogError(Utilities.LogMessage(this, $"An Error Occurred Executing Scheduled Job: {Name} - {ex}"));
+                        }
+                    }
                 }
-            }
-            catch
-            {
-                // can occur during the initial installation as there is no DBContext
-            }
 
+                // wait 1 minute
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            }
         }
 
         private DateTime CalculateNextExecution(DateTime nextExecution, Job job)
@@ -191,9 +206,11 @@ namespace Oqtane.Infrastructure
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            try
+            using (var scope = _serviceScopeFactory.CreateScope())
             {
-                using (var scope = _serviceScopeFactory.CreateScope())
+                ILogger<HostedServiceBase> _filelogger = scope.ServiceProvider.GetRequiredService<ILogger<HostedServiceBase>>();
+
+                try
                 {
                     string jobTypeName = Utilities.GetFullTypeName(GetType().AssemblyQualifiedName);
                     IJobRepository jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
@@ -207,7 +224,7 @@ namespace Oqtane.Infrastructure
                     }
                     else
                     {
-                        // auto registration - job will not run on initial installation but will run after restart
+                        // auto registration - job will not run on initial installation due to no DBContext but will run after restart
                         job = new Job { JobType = jobTypeName };
 
                         // optional HostedServiceBase properties
@@ -233,17 +250,21 @@ namespace Oqtane.Infrastructure
                         jobs.AddJob(job);
                     }
                 }
-
-                _executingTask = ExecuteAsync(_cancellationTokenSource.Token);
-
-                if (_executingTask.IsCompleted)
+                catch (Exception ex)
                 {
-                    return _executingTask;
+                    // can occur during the initial installation because the database has not yet been created
+                    if (!ex.Message.Contains("No database provider has been configured for this DbContext"))
+                    {
+                        _filelogger.LogError(Utilities.LogMessage(this, $"An Error Occurred Starting Scheduled Job: {Name} - {ex}"));
+                    }
                 }
             }
-            catch
+
+            _executingTask = ExecuteAsync(_cancellationTokenSource.Token);
+
+            if (_executingTask.IsCompleted)
             {
-                // can occur during the initial installation because this method is called during startup and the database has not yet been created
+                return _executingTask;
             }
 
             return Task.CompletedTask;
@@ -251,9 +272,11 @@ namespace Oqtane.Infrastructure
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            try
+            using (var scope = _serviceScopeFactory.CreateScope())
             {
-                using (var scope = _serviceScopeFactory.CreateScope())
+                ILogger<HostedServiceBase> _filelogger = scope.ServiceProvider.GetRequiredService<ILogger<HostedServiceBase>>();
+
+                try
                 {
                     string jobTypeName = Utilities.GetFullTypeName(GetType().AssemblyQualifiedName);
                     IJobRepository jobs = scope.ServiceProvider.GetRequiredService<IJobRepository>();
@@ -266,10 +289,11 @@ namespace Oqtane.Infrastructure
                         jobs.UpdateJob(job);
                     }
                 }
-            }
-            catch
-            {
-                // error updating the job
+                catch (Exception ex)
+                {
+                    // error updating the job
+                    _filelogger.LogError(Utilities.LogMessage(this, $"An Error Occurred Stopping Scheduled Job: {Name} - {ex}"));
+                }
             }
 
             // stop called without start

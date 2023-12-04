@@ -214,9 +214,17 @@ app {
     top: 0.5rem;
 }
 
-/* Oqtane Conrol Styles */
+/* Oqtane Control Styles */
 
 /* Pager */
-.page-pointer {
+.app-pager-pointer {
     cursor: pointer;
+}
+
+.app-sort-th {
+    cursor: pointer;
+}
+
+.app-fas {
+    margin-left: 5px;
 }

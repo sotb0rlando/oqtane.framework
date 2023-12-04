@@ -23,62 +23,13 @@
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="logo" HelpText="Specify a logo for the site" ResourceKey="Logo">Logo: </Label>
-                <div class="col-sm-9">
-                    <FileManager FileId="@_logofileid" Filter="@Constants.ImageFiles" @ref="_logofilemanager" />
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="favicon" HelpText="Specify a Favicon" ResourceKey="FavoriteIcon">Favicon: </Label>
-                <div class="col-sm-9">
-                    <FileManager FileId="@_faviconfileid" Filter="ico" @ref="_faviconfilemanager" />
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="defaultTheme" HelpText="Select the sites default theme" ResourceKey="DefaultTheme">Default Theme: </Label>
-                <div class="col-sm-9">
-                    <select id="defaultTheme" class="form-select" value="@_themetype" @onchange="(e => ThemeChanged(e))" required>
-                        <option value="-">&lt;@Localizer["Theme.Select"]&gt;</option>
-                        @foreach (var theme in _themes)
-                        {
-                            <option value="@theme.TypeName">@theme.Name</option>
-                        }
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="defaultContainer" HelpText="Select the default container for the site" ResourceKey="DefaultContainer">Default Container: </Label>
-                <div class="col-sm-9">
-                    <select id="defaultContainer" class="form-select" @bind="@_containertype" required>
-                        <option value="-">&lt;@Localizer["Container.Select"]&gt;</option>
-                        @foreach (var container in _containers)
-                        {
-                            <option value="@container.TypeName">@container.Name</option>
-                        }
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="defaultAdminContainer" HelpText="Select the default admin container for the site" ResourceKey="DefaultAdminContainer">Default Admin Container: </Label>
-                <div class="col-sm-9">
-                    <select id="defaultAdminContainer" class="form-select" @bind="@_admincontainertype" required>
-                        <option value="-">&lt;@Localizer["Container.Select"]&gt;</option>
-                        <option value="@Constants.DefaultAdminContainer">&lt;@Localizer["DefaultAdminContainer"]&gt;</option>
-                        @foreach (var container in _containers)
-                        {
-                            <option value="@container.TypeName">@container.Name</option>
-                        }
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
                 <Label Class="col-sm-3" For="homepage" HelpText="Select the home page for the site (to be used if there is no page with a path of '/')" ResourceKey="HomePage">Home Page: </Label>
                 <div class="col-sm-9">
                     <select id="homepage" class="form-select" @bind="@_homepageid" required>
-						<option value="-">&lt;@Localizer["Not Specified"]&gt;</option>
+                        <option value="-">&lt;@SharedLocalizer["Not Specified"]&gt;</option>
                         @foreach (Page page in PageState.Pages)
                         {
-							if (UserSecurity.ContainsRole(page.Permissions, PermissionNames.View, RoleNames.Everyone))
+							if (UserSecurity.ContainsRole(page.PermissionList, PermissionNames.View, RoleNames.Everyone))
 							{
 								<option value="@(page.PageId)">@(new string('-', page.Level * 2))@(page.Name)</option>
 							}
@@ -95,7 +46,95 @@
 					</select>
 				</div>
 			</div>
-		</div>
+			<div class="row mb-1 align-items-center">
+				<Label Class="col-sm-3" For="sitemap" HelpText="The site map url for this site which can be submitted to search engines for indexing" ResourceKey="SiteMap">Site Map: </Label>
+				<div class="col-sm-9">
+                    <div class="input-group">
+                        <input id="sitemap" class="form-control" @bind="@_sitemap" disabled />
+                        <a href="@_sitemap" class="btn btn-secondary" target="_new">@Localizer["Browse"]</a>
+                    </div>
+                </div>
+			</div>
+            <div class="row mb-1 align-items-center">
+                <Label Class="col-sm-3" For="siteguid" HelpText="The Unique Identifier For The Site" ResourceKey="SiteGuid">ID: </Label>
+                <div class="col-sm-9">
+                    <input id="siteguid" class="form-control" @bind="@_siteguid" required disabled />
+                </div>
+            </div>
+            <div class="row mb-1 align-items-center">
+                <Label Class="col-sm-3" For="version" HelpText="The site version (for site content migrations)" ResourceKey="Version">Version: </Label>
+                <div class="col-sm-9">
+                    <input id="version" class="form-control" @bind="@_version" required disabled />
+                </div>
+            </div>
+        </div>
+        <br />
+        <Section Name="Appearance" Heading="Appearance" ResourceKey="Appearance">
+            <div class="container">
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="logo" HelpText="Specify a logo for the site" ResourceKey="Logo">Logo: </Label>
+                    <div class="col-sm-9">
+                        <FileManager FileId="@_logofileid" Filter="@Constants.ImageFiles" @ref="_logofilemanager" />
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="favicon" HelpText="Specify a Favicon" ResourceKey="FavoriteIcon">Favicon: </Label>
+                    <div class="col-sm-9">
+                        <FileManager FileId="@_faviconfileid" Filter="ico,png,gif" @ref="_faviconfilemanager" />
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="defaultTheme" HelpText="Select the sites default theme" ResourceKey="DefaultTheme">Default Theme: </Label>
+                    <div class="col-sm-9">
+                        <select id="defaultTheme" class="form-select" value="@_themetype" @onchange="(e => ThemeChanged(e))" required>
+                            @foreach (var theme in _themes)
+                            {
+                                <option value="@theme.TypeName">@theme.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="defaultContainer" HelpText="Select the default container for the site" ResourceKey="DefaultContainer">Default Container: </Label>
+                    <div class="col-sm-9">
+                        <select id="defaultContainer" class="form-select" @bind="@_containertype" required>
+                            @foreach (var container in _containers)
+                            {
+                                <option value="@container.TypeName">@container.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="defaultAdminContainer" HelpText="Select the default admin container for the site" ResourceKey="DefaultAdminContainer">Default Admin Container: </Label>
+                    <div class="col-sm-9">
+                        <select id="defaultAdminContainer" class="form-select" @bind="@_admincontainertype" required>
+                            <option value="@Constants.DefaultAdminContainer">&lt;@Localizer["DefaultAdminContainer"]&gt;</option>
+                            @foreach (var container in _containers)
+                            {
+                                <option value="@container.TypeName">@container.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </Section>
+        <Section Name="PageContent" Heading="Page Content" ResourceKey="PageContent">
+           <div class="container">
+               <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="headcontent" HelpText="Optionally enter content to be included in the page head (ie. meta, link, or script tags)" ResourceKey="HeadContent">Head Content: </Label>
+                    <div class="col-sm-9">
+                        <textarea id="headcontent" class="form-control" @bind="@_headcontent" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="bodycontent" HelpText="Optionally enter content to be included in the page body (ie. script tags)" ResourceKey="BodyContent">Body Content: </Label>
+                    <div class="col-sm-9">
+                        <textarea id="bodycontent" class="form-control" @bind="@_bodycontent" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+        </Section>
         <Section Name="SMTP" Heading="SMTP Settings" ResourceKey="SMTPSettings">
             <div class="container">
                 <div class="row mb-1 align-items-center">
@@ -118,16 +157,16 @@
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
-                    <Label Class="col-sm-3" For="enabledSSl" HelpText="Specify if SSL is required for your SMTP server" ResourceKey="UseSsl">SSL Enabled: </Label>
+                    <Label Class="col-sm-3" For="smtpssl" HelpText="Specify if SSL is required for your SMTP server" ResourceKey="UseSsl">SSL Enabled: </Label>
                     <div class="col-sm-9">
-                        <select id="enabledSSl" class="form-select" @bind="@_smtpssl" >
+                        <select id="smtpssl" class="form-select" @bind="@_smtpssl" >
                             <option value="True">@SharedLocalizer["Yes"]</option>
                             <option value="False">@SharedLocalizer["No"]</option>
                         </select>
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
-                    <Label Class="col-sm-3" For="username" HelpText="Enter the username for your SMTP account" ResourceKey="SmptUsername">Username: </Label>
+                    <Label Class="col-sm-3" For="username" HelpText="Enter the username for your SMTP account" ResourceKey="SmtpUsername">Username: </Label>
                     <div class="col-sm-9">
                         <input id="username" class="form-control" @bind="@_smtpusername" />
                     </div>
@@ -137,20 +176,38 @@
                     <div class="col-sm-9">
 						<div class="input-group">
 							<input id="password" type="@_smtppasswordtype" class="form-control" @bind="@_smtppassword" />
-							<button type="button" class="btn btn-secondary" @onclick="@ToggleSMTPPassword">@_togglesmtppassword</button>
+                            <button type="button" class="btn btn-secondary" @onclick="@ToggleSMTPPassword" tabindex="-1">@_togglesmtppassword</button>
 						</div>
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
-                    <Label Class="col-sm-3" For="sender" HelpText="Enter the email which emails will be sent from. Please note that this email address may need to be authorized with the SMTP server." ResourceKey="SmptSender">Email Sender: </Label>
+                    <Label Class="col-sm-3" For="sender" HelpText="Enter the email which emails will be sent from. Please note that this email address may need to be authorized with the SMTP server." ResourceKey="SmtpSender">Email Sender: </Label>
                     <div class="col-sm-9">
                         <input id="sender" class="form-control" @bind="@_smtpsender" />
+                    </div>
+                </div>
+				<div class="row mb-1 align-items-center">
+					<Label Class="col-sm-3" For="relay" HelpText="Only specify this option if you have properly configured an SMTP Relay Service to route your outgoing mail. This option will send notifications from the user's email rather than from the Email Sender specified above." ResourceKey="SmtpRelay">Relay Configured? </Label>
+					<div class="col-sm-9">
+						<select id="relay" class="form-select" @bind="@_smtprelay" required>
+							<option value="True">@SharedLocalizer["Yes"]</option>
+							<option value="False">@SharedLocalizer["No"]</option>
+						</select>
+					</div>
+				</div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="smtpenabled" HelpText="Specify if SMTP is enabled for this site" ResourceKey="SMTPEnabled">Enabled? </Label>
+                    <div class="col-sm-9">
+                        <select id="smtpenabled" class="form-select" @bind="@_smtpenabled">
+                            <option value="True">@SharedLocalizer["Yes"]</option>
+                            <option value="False">@SharedLocalizer["No"]</option>
+                        </select>
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
 					<Label Class="col-sm-3" For="retention" HelpText="Number of days of notifications to retain" ResourceKey="Retention">Retention (Days): </Label>
 					<div class="col-sm-9">
-						<input id="retention" class="form-control" @bind="@_retention" />
+                        <input id="retention" class="form-control" type="number" min="0" step="1" @bind="@_retention" />
 					</div>
                 </div>
                 <button type="button" class="btn btn-secondary" @onclick="SendEmail">@Localizer["Smtp.TestConfig"]</button>
@@ -186,53 +243,53 @@
         {
 			<Section Name="Aliases" Heading="Aliases" ResourceKey="Aliases">
 	            <div class="container">
-						<div class="row mb-1 align-items-center">
-							<Label Class="col-sm-3" For="aliases" HelpText="The list of aliases for this site" ResourceKey="Aliases">Aliases: </Label>
-							<div class="col-sm-9">
-								<button type="button" class="btn btn-primary" @onclick="AddAlias">@SharedLocalizer["Add"]</button>
-								<Pager Items="@_aliases">
-									<Header>
-										<th style="width: 1px;">&nbsp;</th>
-										<th style="width: 1px;">&nbsp;</th>
-										<th>@Localizer["AliasName"]</th>
-										<th>@Localizer["AliasDefault"]</th>
-									</Header>
-									<Row>
-										@if (context.AliasId != _aliasid)
-										{
-											<td>
-												@if (_aliasid == -1)
-												{
-													<button type="button" class="btn btn-primary" @onclick="@(() => EditAlias(context))">@SharedLocalizer["Edit"]</button>
-												}
-											</td>
-											<td>
-												@if (_aliasid == -1)
-												{
-													<ActionDialog Action="Delete" OnClick="@(async () => await DeleteAlias(context))" ResourceKey="DeleteModule" Class="btn btn-danger" Header="Delete Alias" Message="@string.Format(Localizer["Confirm.Alias.Delete", context.Name])" />
-												}
-											</td>
-											<td>@context.Name</td>
-											<td>@context.IsDefault</td>
-										}
-										else
-										{
-											<td><button type="button" class="btn btn-success" @onclick="@(async () => await SaveAlias())">@SharedLocalizer["Save"]</button></td>
-											<td><button type="button" class="btn btn-secondary" @onclick="@(async () => await CancelAlias())">@SharedLocalizer["Cancel"]</button></td>
-											<td>
-												<input id="aliasname" class="form-control" @bind="@_aliasname" />
-											</td>
-											<td>
-												<select id="defaultaias" class="form-select" @bind="@_defaultalias" required>
-													<option value="True">@SharedLocalizer["Yes"]</option>
-													<option value="False">@SharedLocalizer["No"]</option>
-												</select>
-											</td>
-										}
-									</Row>
-								</Pager>
-							</div>
+					<div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="aliases" HelpText="The urls for the site. This can include domain names (ie. domain.com), subdomains (ie. sub.domain.com) or virtual folders (ie. domain.com/folder)." ResourceKey="Aliases">Aliases: </Label>
+						<div class="col-sm-9">
+							<button type="button" class="btn btn-primary" @onclick="AddAlias">@SharedLocalizer["Add"]</button>
+							<Pager Items="@_aliases">
+								<Header>
+									<th style="width: 1px;">&nbsp;</th>
+									<th style="width: 1px;">&nbsp;</th>
+									<th>@Localizer["AliasName"]</th>
+									<th>@Localizer["AliasDefault"]</th>
+								</Header>
+								<Row>
+									@if (context.AliasId != _aliasid)
+									{
+										<td>
+											@if (_aliasid == -1)
+											{
+												<button type="button" class="btn btn-primary" @onclick="@(() => EditAlias(context))">@SharedLocalizer["Edit"]</button>
+											}
+										</td>
+										<td>
+											@if (_aliasid == -1)
+											{
+												<ActionDialog Action="Delete" OnClick="@(async () => await DeleteAlias(context))" ResourceKey="DeleteAlias" Class="btn btn-danger" Header="Delete Alias" Message="@string.Format(Localizer["Confirm.Alias.Delete", context.Name])" />
+											}
+										</td>
+										<td>@context.Name</td>
+										<td>@context.IsDefault</td>
+									}
+									else
+									{
+										<td><button type="button" class="btn btn-success" @onclick="@(async () => await SaveAlias())">@SharedLocalizer["Save"]</button></td>
+										<td><button type="button" class="btn btn-secondary" @onclick="@(async () => await CancelAlias())">@SharedLocalizer["Cancel"]</button></td>
+										<td>
+											<input id="aliasname" class="form-control" @bind="@_aliasname" />
+										</td>
+										<td>
+											<select id="defaultalias" class="form-select" @bind="@_defaultalias" required>
+												<option value="True">@SharedLocalizer["Yes"]</option>
+												<option value="False">@SharedLocalizer["No"]</option>
+											</select>
+										</td>
+									}
+								</Row>
+							</Pager>
 						</div>
+					</div>
 				</div>
 			</Section>
             <Section Name="Hosting" Heading="Hosting Model" ResourceKey="Hosting">
@@ -243,7 +300,6 @@
                             <select id="runtime" class="form-select" @bind="@_runtime" required>
                                 <option value="Server">@SharedLocalizer["BlazorServer"]</option>
                                 <option value="WebAssembly">@SharedLocalizer["BlazorWebAssembly"]</option>
-                                <option value="Hybrid">@SharedLocalizer["BlazorHybrid"]</option>
                             </select>
                         </div>
                     </div>
@@ -258,16 +314,16 @@
                     </div>
                 </div>
             </Section>
-            <Section Name="TenantInformation" Heading="Tenant Information" ResourceKey="TenantInformation">
+            <Section Name="TenantInformation" Heading="Database" ResourceKey="TenantInformation">
                 <div class="container">
                     <div class="row mb-1 align-items-center">
-                        <Label Class="col-sm-3" For="tenant" HelpText="The tenant for the site" ResourceKey="Tenant">Tenant: </Label>
+						<Label Class="col-sm-3" For="tenant" HelpText="The name of the database used for the site" ResourceKey="Tenant">Database: </Label>
                         <div class="col-sm-9">
                             <input id="tenant" class="form-control" @bind="@_tenant" readonly />
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
-                        <Label Class="col-sm-3" For="database" HelpText="The database for the tenant" ResourceKey="Database">Database: </Label>
+                        <Label Class="col-sm-3" For="database" HelpText="The type of database" ResourceKey="Database">Type: </Label>
                         <div class="col-sm-9">
                             <input id="database" class="form-control" @bind="@_database" readonly />
                         </div>
@@ -275,7 +331,7 @@
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="connectionstring" HelpText="The connection information for the database" ResourceKey="ConnectionString">Connection: </Label>
                         <div class="col-sm-9">
-                            <textarea id="connectionstring" class="form-control" @bind="@_connectionstring" rows="2" readonly></textarea>
+							<input id="connectionstring" class="form-control" @bind="@_connectionstring" readonly />
                         </div>
                     </div>
                 </div>
@@ -291,218 +347,236 @@
 }
 
 @code {
-	private ElementReference form;
-	private bool validated = false;
-	private bool _initialized = false;
-	private List<Theme> _themeList;
-	private List<ThemeControl> _themes = new List<ThemeControl>();
-	private List<ThemeControl> _containers = new List<ThemeControl>();
-	private string _name = string.Empty;
-	private List<Alias> _aliases;
-	private int _aliasid = -1;
-	private string _aliasname;
-	private string _defaultalias;
-	private string _runtime = "";
-	private string _prerender = "";
-	private int _logofileid = -1;
-	private FileManager _logofilemanager;
-	private int _faviconfileid = -1;
-	private FileManager _faviconfilemanager;
-	private string _themetype = "-";
-	private string _containertype = "-";
-	private string _admincontainertype = "-";
-	private string _homepageid = "-";
-	private string _smtphost = string.Empty;
-	private string _smtpport = string.Empty;
-	private string _smtpssl = "False";
-	private string _smtpusername = string.Empty;
-	private string _smtppassword = string.Empty;
-	private string _smtppasswordtype = "password";
-	private string _togglesmtppassword = string.Empty;
-	private string _smtpsender = string.Empty;
-	private string _retention = string.Empty;
-	private string _pwaisenabled;
-	private int _pwaappiconfileid = -1;
-	private FileManager _pwaappiconfilemanager;
-	private int _pwasplashiconfileid = -1;
-	private FileManager _pwasplashiconfilemanager;
-	private string _tenant = string.Empty;
-	private string _database = string.Empty;
-	private string _connectionstring = string.Empty;
-	private string _createdby;
-	private DateTime _createdon;
-	private string _modifiedby;
-	private DateTime _modifiedon;
-	private string _deletedby;
-	private DateTime? _deletedon;
-	private string _isdeleted;
+    private ElementReference form;
+    private bool validated = false;
+    private bool _initialized = false;
+    private List<ThemeControl> _themes = new List<ThemeControl>();
+    private List<ThemeControl> _containers = new List<ThemeControl>();
+    private string _name = string.Empty;
+    private string _homepageid = "-";
+    private string _isdeleted;
+    private string _sitemap = "";
+    private string _siteguid = "";
+    private string _version = "";
+    private int _logofileid = -1;
+    private FileManager _logofilemanager;
+    private int _faviconfileid = -1;
+    private FileManager _faviconfilemanager;
+    private string _themetype = "";
+    private string _containertype = "";
+    private string _admincontainertype = "";
+    private string _headcontent = string.Empty;
+    private string _bodycontent = string.Empty;
+    private string _smtphost = string.Empty;
+    private string _smtpport = string.Empty;
+    private string _smtpssl = "False";
+    private string _smtpusername = string.Empty;
+    private string _smtppassword = string.Empty;
+    private string _smtppasswordtype = "password";
+    private string _togglesmtppassword = string.Empty;
+    private string _smtpsender = string.Empty;
+    private string _smtprelay = "False";
+    private string _smtpenabled = "True";
+    private int _retention = 30;
+    private string _pwaisenabled;
+    private int _pwaappiconfileid = -1;
+    private FileManager _pwaappiconfilemanager;
+    private int _pwasplashiconfileid = -1;
+    private FileManager _pwasplashiconfilemanager;
+    private List<Alias> _aliases;
+    private int _aliasid = -1;
+    private string _aliasname;
+    private string _defaultalias;
+    private string _runtime = "";
+    private string _prerender = "";
+    private string _tenant = string.Empty;
+    private string _database = string.Empty;
+    private string _connectionstring = string.Empty;
+    private string _createdby;
+    private DateTime _createdon;
+    private string _modifiedby;
+    private DateTime _modifiedon;
+    private string _deletedby;
+    private DateTime? _deletedon;
 
-	public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Admin;
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Admin;
 
-	protected override async Task OnInitializedAsync()
-	{
-		try
-		{
-			_themeList = await ThemeService.GetThemesAsync();
-			Site site = await SiteService.GetSiteAsync(PageState.Site.SiteId);
-			if (site != null)
-			{
-				_name = site.Name;
-				_runtime = site.Runtime;
-				_prerender = site.RenderMode.Replace(_runtime, "");
-				_isdeleted = site.IsDeleted.ToString();
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Site site = await SiteService.GetSiteAsync(PageState.Site.SiteId);
+            if (site != null)
+            {
+                _name = site.Name;
+                if (site.HomePageId != null)
+                {
+                    _homepageid = site.HomePageId.Value.ToString();
+                }
+                _isdeleted = site.IsDeleted.ToString();
+                _sitemap = PageState.Alias.Protocol + PageState.Alias.Name + "/pages/sitemap.xml";
+                _siteguid = site.SiteGuid;
+                _version = site.Version;
 
-				await GetAliases();
+                // appearance
+                if (site.LogoFileId != null)
+                {
+                    _logofileid = site.LogoFileId.Value;
+                }
 
-				if (site.LogoFileId != null)
-				{
-					_logofileid = site.LogoFileId.Value;
-				}
+                if (site.FaviconFileId != null)
+                {
+                    _faviconfileid = site.FaviconFileId.Value;
+                }
+                _themes = ThemeService.GetThemeControls(PageState.Site.Themes);
+                _themetype = (!string.IsNullOrEmpty(site.DefaultThemeType)) ? site.DefaultThemeType : Constants.DefaultTheme;
+                _containers = ThemeService.GetContainerControls(PageState.Site.Themes, _themetype);
+                _containertype = (!string.IsNullOrEmpty(site.DefaultContainerType)) ? site.DefaultContainerType : Constants.DefaultContainer;
+                _admincontainertype = (!string.IsNullOrEmpty(site.AdminContainerType)) ? site.AdminContainerType : Constants.DefaultAdminContainer;
 
-				if (site.FaviconFileId != null)
-				{
-					_faviconfileid = site.FaviconFileId.Value;
-				}
+                // page content
+                _headcontent = site.HeadContent;
+                _bodycontent = site.BodyContent;
 
-				_themes = ThemeService.GetThemeControls(_themeList);
-				_themetype = (!string.IsNullOrEmpty(site.DefaultThemeType)) ? site.DefaultThemeType : Constants.DefaultTheme;
-				_containers = ThemeService.GetContainerControls(_themeList, _themetype);
-				_containertype = (!string.IsNullOrEmpty(site.DefaultContainerType)) ? site.DefaultContainerType : Constants.DefaultContainer;
-				_admincontainertype = (!string.IsNullOrEmpty(site.AdminContainerType)) ? site.AdminContainerType : Constants.DefaultAdminContainer;
+                // PWA
+                _pwaisenabled = site.PwaIsEnabled.ToString();
+                if (site.PwaAppIconFileId != null)
+                {
+                    _pwaappiconfileid = site.PwaAppIconFileId.Value;
+                }
+                if (site.PwaSplashIconFileId != null)
+                {
+                    _pwasplashiconfileid = site.PwaSplashIconFileId.Value;
+                }
 
-				if (site.HomePageId != null)
-				{
-					_homepageid = site.HomePageId.Value.ToString();
-				}
+                // SMTP
+                var settings = await SettingService.GetSiteSettingsAsync(site.SiteId);
+                _smtphost = SettingService.GetSetting(settings, "SMTPHost", string.Empty);
+                _smtpport = SettingService.GetSetting(settings, "SMTPPort", string.Empty);
+                _smtpssl = SettingService.GetSetting(settings, "SMTPSSL", "False");
+                _smtpusername = SettingService.GetSetting(settings, "SMTPUsername", string.Empty);
+                _smtppassword = SettingService.GetSetting(settings, "SMTPPassword", string.Empty);
+                _togglesmtppassword = SharedLocalizer["ShowPassword"];
+                _smtpsender = SettingService.GetSetting(settings, "SMTPSender", string.Empty);
+                _smtprelay = SettingService.GetSetting(settings, "SMTPRelay", "False");
+                _smtpenabled = SettingService.GetSetting(settings, "SMTPEnabled", "True");
+                _retention = int.Parse(SettingService.GetSetting(settings, "NotificationRetention", "30"));
 
-				_pwaisenabled = site.PwaIsEnabled.ToString();
-				if (site.PwaAppIconFileId != null)
-				{
-					_pwaappiconfileid = site.PwaAppIconFileId.Value;
-				}
-				if (site.PwaSplashIconFileId != null)
-				{
-					_pwasplashiconfileid = site.PwaSplashIconFileId.Value;
-				}
+                // aliases
+                await GetAliases();
 
-				var settings = await SettingService.GetSiteSettingsAsync(site.SiteId);
-				_smtphost = SettingService.GetSetting(settings, "SMTPHost", string.Empty);
-				_smtpport = SettingService.GetSetting(settings, "SMTPPort", string.Empty);
-				_smtpssl = SettingService.GetSetting(settings, "SMTPSSL", "False");
-				_smtpusername = SettingService.GetSetting(settings, "SMTPUsername", string.Empty);
-				_smtppassword = SettingService.GetSetting(settings, "SMTPPassword", string.Empty);
-				_togglesmtppassword = SharedLocalizer["ShowPassword"];
-				_smtpsender = SettingService.GetSetting(settings, "SMTPSender", string.Empty);
-				_retention = SettingService.GetSetting(settings, "NotificationRetention", "30");
+                // hosting model
+                _runtime = site.Runtime;
+                _prerender = site.RenderMode.Replace(_runtime, "");
 
-				if (UserSecurity.IsAuthorized(PageState.User, RoleNames.Host))
-				{
-					var tenants = await TenantService.GetTenantsAsync();
-					var _databases = await DatabaseService.GetDatabasesAsync();
-					var tenant = tenants.Find(item => item.TenantId == site.TenantId);
-					if (tenant != null)
-					{
-						_tenant = tenant.Name;
-						_database = _databases.Find(item => item.DBType == tenant.DBType)?.Name;
-						_connectionstring = tenant.DBConnectionString;
-					}
-				}
+                // database
+                if (UserSecurity.IsAuthorized(PageState.User, RoleNames.Host))
+                {
+                    var tenants = await TenantService.GetTenantsAsync();
+                    var _databases = await DatabaseService.GetDatabasesAsync();
+                    var tenant = tenants.Find(item => item.TenantId == site.TenantId);
+                    if (tenant != null)
+                    {
+                        _tenant = tenant.Name;
+                        _database = _databases.Find(item => item.DBType == tenant.DBType)?.Name;
+                        _connectionstring = tenant.DBConnectionString;
+                    }
+                }
 
-				_createdby = site.CreatedBy;
-				_createdon = site.CreatedOn;
-				_modifiedby = site.ModifiedBy;
-				_modifiedon = site.ModifiedOn;
-				_deletedby = site.DeletedBy;
-				_deletedon = site.DeletedOn;
+                // audit
+                _createdby = site.CreatedBy;
+                _createdon = site.CreatedOn;
+                _modifiedby = site.ModifiedBy;
+                _modifiedon = site.ModifiedOn;
+                _deletedby = site.DeletedBy;
+                _deletedon = site.DeletedOn;
 
-				_initialized = true;
-			}
-		}
-		catch (Exception ex)
-		{
-			await logger.LogError(ex, "Error Loading Site {SiteId} {Error}", PageState.Site.SiteId, ex.Message);
-			AddModuleMessage(ex.Message, MessageType.Error);
-		}
-	}
+                _initialized = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading Site {SiteId} {Error}", PageState.Site.SiteId, ex.Message);
+            AddModuleMessage(ex.Message, MessageType.Error);
+        }
+    }
 
-	private async void ThemeChanged(ChangeEventArgs e)
-	{
-		try
-		{
-			_themetype = (string)e.Value;
-			if (_themetype != "-")
-			{
-				_containers = ThemeService.GetContainerControls(_themeList, _themetype);
-			}
-			else
-			{
-				_containers = new List<ThemeControl>();
-			}
-			_containertype = "-";
-			_admincontainertype = Constants.DefaultAdminContainer;
-			StateHasChanged();
-		}
-		catch (Exception ex)
-		{
-			await logger.LogError(ex, "Error Loading Containers For Theme {ThemeType} {Error}", _themetype, ex.Message);
-			AddModuleMessage(Localizer["Error.Theme.LoadPane"], MessageType.Error);
-		}
-	}
+    private async void ThemeChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            _themetype = (string)e.Value;
+            _containers = ThemeService.GetContainerControls(PageState.Site.Themes, _themetype);
+            _containertype = _containers.First().TypeName;
+            _admincontainertype = Constants.DefaultAdminContainer;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading Containers For Theme {ThemeType} {Error}", _themetype, ex.Message);
+            AddModuleMessage(Localizer["Error.Theme.LoadPane"], MessageType.Error);
+        }
+    }
 
-	private async Task SaveSite()
-	{
-		validated = true;
-		var interop = new Interop(JSRuntime);
-		if (await interop.FormValid(form))
-		{
-			try
-			{
-				if (_name != string.Empty && _themetype != "-" && _containertype != "-")
-				{
-					var site = await SiteService.GetSiteAsync(PageState.Site.SiteId);
-					if (site != null)
-					{
-						bool refresh = false;
-						bool reload = false;
+    private async Task SaveSite()
+    {
+        validated = true;
+        var interop = new Interop(JSRuntime);
+        if (await interop.FormValid(form))
+        {
+            try
+            {
+                if (_name != string.Empty && _themetype != "-" && _containertype != "-")
+                {
+                    var site = await SiteService.GetSiteAsync(PageState.Site.SiteId);
+                    if (site != null)
+                    {
+                        bool refresh = false;
+                        bool reload = false;
 
-						site.Name = _name;
-						if (UserSecurity.IsAuthorized(PageState.User, RoleNames.Host))
-						{
-							if (site.Runtime != _runtime || site.RenderMode != _runtime + _prerender)
-							{
-								site.Runtime = _runtime;
-								site.RenderMode = _runtime + _prerender;
-								reload = true; // needs to be reloaded on server
-							}
-						}
-						site.IsDeleted = (_isdeleted == null ? true : Boolean.Parse(_isdeleted));
+                        site.Name = _name;
+                        site.HomePageId = (_homepageid != "-" ? int.Parse(_homepageid) : null);
+                        site.IsDeleted = (_isdeleted == null ? true : Boolean.Parse(_isdeleted));
 
-						site.LogoFileId = null;
-						var logofileid = _logofilemanager.GetFileId();
-						if (logofileid != -1)
-						{
-							site.LogoFileId = logofileid;
-						}
-						int? faviconFieldId = _faviconfilemanager.GetFileId();
-						if (faviconFieldId == -1) faviconFieldId = null;
-						if (site.FaviconFileId != faviconFieldId)
-						{
-							site.FaviconFileId = faviconFieldId;
-							reload = true; // needs to be reloaded on server
-						}
-						if (site.DefaultThemeType != _themetype)
-						{
-							site.DefaultThemeType = _themetype;
-							refresh = true; // needs to be refreshed on client
-						}
-						if (site.DefaultContainerType != _containertype)
-						{
-							site.DefaultContainerType = _containertype;
-							refresh = true; // needs to be refreshed on client
-						}
-						site.AdminContainerType = _admincontainertype;
-						site.HomePageId = (_homepageid != "-" ? int.Parse(_homepageid) : null);
+                        // appearance
+                        site.LogoFileId = null;
+                        var logofileid = _logofilemanager.GetFileId();
+                        if (logofileid != -1)
+                        {
+                            site.LogoFileId = logofileid;
+                        }
+                        int? faviconFieldId = _faviconfilemanager.GetFileId();
+                        if (faviconFieldId == -1) faviconFieldId = null;
+                        if (site.FaviconFileId != faviconFieldId)
+                        {
+                            site.FaviconFileId = faviconFieldId;
+                            reload = true; // needs to be reloaded on server
+                        }
+                        if (site.DefaultThemeType != _themetype)
+                        {
+                            site.DefaultThemeType = _themetype;
+                            refresh = true; // needs to be refreshed on client
+                        }
+                        if (site.DefaultContainerType != _containertype)
+                        {
+                            site.DefaultContainerType = _containertype;
+                            refresh = true; // needs to be refreshed on client
+                        }
+                        site.AdminContainerType = _admincontainertype;
 
+                        // page content
+                        if (site.HeadContent != _headcontent)
+                        {
+                            site.HeadContent = _headcontent;
+                            reload = true;
+                        }
+                        if (site.BodyContent != _bodycontent)
+                        {
+                            site.BodyContent = _bodycontent;
+                            reload = true;
+                        }
+
+                        // PWA
 						if (site.PwaIsEnabled.ToString() != _pwaisenabled)
 						{
 							site.PwaIsEnabled = Boolean.Parse(_pwaisenabled);
@@ -523,16 +597,31 @@
 							reload = true; // needs to be reloaded on server
 						}
 
+                        // hosting model
+                        if (UserSecurity.IsAuthorized(PageState.User, RoleNames.Host))
+                        {
+                            if (site.Runtime != _runtime || site.RenderMode != _runtime + _prerender)
+                            {
+                                site.Runtime = _runtime;
+                                site.RenderMode = _runtime + _prerender;
+                                reload = true; // needs to be reloaded on server
+                            }
+                        }
+
 						site = await SiteService.UpdateSiteAsync(site);
 
+                        // SMTP
 						var settings = await SettingService.GetSiteSettingsAsync(site.SiteId);
-						settings = SettingService.SetSetting(settings, "SMTPHost", _smtphost, true);
+                        settings = SettingService.SetSetting(settings, "SMTPHost", _smtphost, true);
 						settings = SettingService.SetSetting(settings, "SMTPPort", _smtpport, true);
 						settings = SettingService.SetSetting(settings, "SMTPSSL", _smtpssl, true);
 						settings = SettingService.SetSetting(settings, "SMTPUsername", _smtpusername, true);
 						settings = SettingService.SetSetting(settings, "SMTPPassword", _smtppassword, true);
 						settings = SettingService.SetSetting(settings, "SMTPSender", _smtpsender, true);
-						settings = SettingService.SetSetting(settings, "NotificationRetention", _retention, true);
+						settings = SettingService.SetSetting(settings, "SMTPRelay", _smtprelay, true);
+                        settings = SettingService.SetSetting(settings, "SMTPEnabled", _smtpenabled, true);
+                        settings = SettingService.SetSetting(settings, "SiteGuid", _siteguid, true);
+                        settings = SettingService.SetSetting(settings, "NotificationRetention", _retention.ToString(), true);
 						await SettingService.UpdateSiteSettingsAsync(settings, site.SiteId);
 
 						await logger.LogInformation("Site Settings Saved {Site}", site);
@@ -544,8 +633,8 @@
 						else
 						{
 							AddModuleMessage(Localizer["Success.Settings.SaveSite"], MessageType.Success);
-							await interop.ScrollTo(0, 0, "smooth");
-						}
+                            await ScrollToPageTop();
+                        }
 					}
 				}
 				else
@@ -602,20 +691,19 @@
 			try
 			{
 				var settings = await SettingService.GetSiteSettingsAsync(PageState.Site.SiteId);
-				SettingService.SetSetting(settings, "SMTPHost", _smtphost, true);
-				SettingService.SetSetting(settings, "SMTPPort", _smtpport, true);
-				SettingService.SetSetting(settings, "SMTPSSL", _smtpssl, true);
-				SettingService.SetSetting(settings, "SMTPUsername", _smtpusername, true);
-				SettingService.SetSetting(settings, "SMTPPassword", _smtppassword, true);
-				SettingService.SetSetting(settings, "SMTPSender", _smtpsender, true);
+				settings = SettingService.SetSetting(settings, "SMTPHost", _smtphost, true);
+				settings = SettingService.SetSetting(settings, "SMTPPort", _smtpport, true);
+				settings = SettingService.SetSetting(settings, "SMTPSSL", _smtpssl, true);
+				settings = SettingService.SetSetting(settings, "SMTPUsername", _smtpusername, true);
+				settings = SettingService.SetSetting(settings, "SMTPPassword", _smtppassword, true);
+				settings = SettingService.SetSetting(settings, "SMTPSender", _smtpsender, true);
 				await SettingService.UpdateSiteSettingsAsync(settings, PageState.Site.SiteId);
 				await logger.LogInformation("Site SMTP Settings Saved");
 
 				await NotificationService.AddNotificationAsync(new Notification(PageState.Site.SiteId, PageState.User, PageState.Site.Name + " SMTP Configuration Test", "SMTP Server Is Configured Correctly."));
 				AddModuleMessage(Localizer["Info.Smtp.SaveSettings"], MessageType.Info);
-				var interop = new Interop(JSRuntime);
-				await interop.ScrollTo(0, 0, "smooth");
-			}
+                await ScrollToPageTop();
+            }
 			catch (Exception ex)
 			{
 				await logger.LogError(ex, "Error Testing SMTP Configuration");

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -29,9 +30,9 @@ namespace Oqtane.Services
 
         public async Task<List<File>> GetFilesAsync(int siteId, string folderPath)
         {
-            if (!(folderPath.EndsWith(System.IO.Path.DirectorySeparatorChar) || folderPath.EndsWith(System.IO.Path.AltDirectorySeparatorChar)))
+            if (!(string.IsNullOrEmpty(folderPath) || folderPath.EndsWith(System.IO.Path.DirectorySeparatorChar) || folderPath.EndsWith(System.IO.Path.AltDirectorySeparatorChar)))
             {
-                folderPath = Utilities.PathCombine(folderPath, System.IO.Path.DirectorySeparatorChar.ToString());
+                folderPath = Utilities.UrlCombine(folderPath) + "/";
             }
 
             var path = WebUtility.UrlEncode(folderPath);
@@ -43,6 +44,11 @@ namespace Oqtane.Services
         public async Task<File> GetFileAsync(int fileId)
         {
             return await GetJsonAsync<File>($"{Apiurl}/{fileId}");
+        }
+
+        public async Task<File> GetFileAsync(int folderId, string name)
+        {
+            return await GetJsonAsync<File>($"{Apiurl}/name/{name}/{folderId}");
         }
 
         public async Task<File> AddFileAsync(File file)

@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using Oqtane.Enums;
 using Oqtane.Models;
+using Oqtane.Modules;
+using Oqtane.Services;
 using Oqtane.Shared;
 using Oqtane.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Oqtane.Themes
@@ -13,12 +17,18 @@ namespace Oqtane.Themes
     public abstract class ThemeBase : ComponentBase, IThemeControl
     {
         [Inject]
+        protected ILogService LoggingService { get; set; }
+
+        [Inject]
         protected IJSRuntime JSRuntime { get; set; }
 
-        // optional interface properties
+        [Inject]
+        protected SiteState SiteState { get; set; }
 
         [CascadingParameter]
         protected PageState PageState { get; set; }
+
+        // optional interface properties
         public virtual string Name { get; set; }
         public virtual string Thumbnail { get; set; }
         public virtual string Panes { get; set; }
@@ -30,17 +40,33 @@ namespace Oqtane.Themes
         {
             if (firstRender)
             {
-                if (Resources != null && Resources.Exists(item => item.ResourceType == ResourceType.Script))
+                List<Resource> resources = null;
+                var type = GetType();
+                if (type.BaseType == typeof(ThemeBase))
+                {
+                    if (PageState.Page.Resources != null)
+                    {
+                        resources = PageState.Page.Resources.Where(item => item.ResourceType == ResourceType.Script && item.Level != ResourceLevel.Site && item.Namespace == type.Namespace).ToList();
+                    }
+                }
+                else // themecontrolbase, containerbase
+                {
+                    if (Resources != null)
+                    {
+                        resources = Resources.Where(item => item.ResourceType == ResourceType.Script).ToList();
+                    }
+                }
+                if (resources != null && resources.Any())
                 {
                     var interop = new Interop(JSRuntime);
                     var scripts = new List<object>();
                     var inline = 0;
-                    foreach (Resource resource in Resources.Where(item => item.ResourceType == ResourceType.Script))
+                    foreach (Resource resource in resources)
                     {
                         if (!string.IsNullOrEmpty(resource.Url))
                         {
                             var url = (resource.Url.Contains("://")) ? resource.Url : PageState.Alias.BaseUrl + resource.Url;
-                            scripts.Add(new { href = url, bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", es6module = resource.ES6Module });
+                            scripts.Add(new { href = url, bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", es6module = resource.ES6Module, location = resource.Location.ToString().ToLower() });
                         }
                         else
                         {
@@ -137,6 +163,175 @@ namespace Oqtane.Themes
         public string ImageUrl(int fileid, int width, int height, string mode, string position, string background, int rotate, bool recreate)
         {
             return Utilities.ImageUrl(PageState.Alias, fileid, width, height, mode, position, background, rotate, recreate);
+        }
+
+        public void SetPageTitle(string title)
+        {
+            SiteState.Properties.PageTitle = title;
+        }
+
+        // note - only supports links and meta tags - not scripts
+        public void AddHeadContent(string content)
+        {
+            SiteState.AppendHeadContent(content);
+        }
+
+        public void AddScript(Resource resource)
+        {
+            resource.ResourceType = ResourceType.Script;
+            if (Resources == null) Resources = new List<Resource>();
+            if (!Resources.Any(item => (!string.IsNullOrEmpty(resource.Url) && item.Url == resource.Url) || (!string.IsNullOrEmpty(resource.Content) && item.Content == resource.Content)))
+            {
+                Resources.Add(resource);
+            }
+        }
+
+        public async Task ScrollToPageTop()
+        {
+            var interop = new Interop(JSRuntime);
+            await interop.ScrollTo(0, 0, "smooth");
+        }
+
+        // logging methods
+        public async Task Log(Alias alias, LogLevel level, string function, Exception exception, string message, params object[] args)
+        {
+            LogFunction logFunction;
+            if (string.IsNullOrEmpty(function))
+            {
+                // try to infer from page action
+                function = PageState.Action;
+            }
+            if (!Enum.TryParse(function, out logFunction))
+            {
+                switch (function.ToLower())
+                {
+                    case "add":
+                        logFunction = LogFunction.Create;
+                        break;
+                    case "edit":
+                        logFunction = LogFunction.Update;
+                        break;
+                    case "delete":
+                        logFunction = LogFunction.Delete;
+                        break;
+                    case "":
+                        logFunction = LogFunction.Read;
+                        break;
+                    default:
+                        logFunction = LogFunction.Other;
+                        break;
+                }
+            }
+            await Log(alias, level, logFunction, exception, message, args);
+        }
+
+        public async Task Log(Alias alias, LogLevel level, LogFunction function, Exception exception, string message, params object[] args)
+        {
+            int pageId = PageState.Page.PageId;
+            string category = GetType().AssemblyQualifiedName;
+            string feature = Utilities.GetTypeNameLastSegment(category, 1);
+
+            await LoggingService.Log(alias, pageId, null, PageState.User?.UserId, category, feature, function, level, exception, message, args);
+        }
+
+        public class Logger
+        {
+            private readonly ModuleBase _moduleBase;
+
+            public Logger(ModuleBase moduleBase)
+            {
+                _moduleBase = moduleBase;
+            }
+
+            public async Task LogTrace(string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Trace, "", null, message, args);
+            }
+
+            public async Task LogTrace(LogFunction function, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Trace, function, null, message, args);
+            }
+
+            public async Task LogTrace(Exception exception, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Trace, "", exception, message, args);
+            }
+
+            public async Task LogDebug(string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Debug, "", null, message, args);
+            }
+
+            public async Task LogDebug(LogFunction function, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Debug, function, null, message, args);
+            }
+
+            public async Task LogDebug(Exception exception, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Debug, "", exception, message, args);
+            }
+
+            public async Task LogInformation(string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Information, "", null, message, args);
+            }
+
+            public async Task LogInformation(LogFunction function, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Information, function, null, message, args);
+            }
+
+            public async Task LogInformation(Exception exception, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Information, "", exception, message, args);
+            }
+
+            public async Task LogWarning(string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Warning, "", null, message, args);
+            }
+
+            public async Task LogWarning(LogFunction function, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Warning, function, null, message, args);
+            }
+
+            public async Task LogWarning(Exception exception, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Warning, "", exception, message, args);
+            }
+
+            public async Task LogError(string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Error, "", null, message, args);
+            }
+
+            public async Task LogError(LogFunction function, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Error, function, null, message, args);
+            }
+
+            public async Task LogError(Exception exception, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Error, "", exception, message, args);
+            }
+
+            public async Task LogCritical(string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Critical, "", null, message, args);
+            }
+
+            public async Task LogCritical(LogFunction function, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Critical, function, null, message, args);
+            }
+
+            public async Task LogCritical(Exception exception, string message, params object[] args)
+            {
+                await _moduleBase.Log(null, LogLevel.Critical, "", exception, message, args);
+            }
         }
 
         [Obsolete("ContentUrl(int fileId) is deprecated. Use FileUrl(int fileId) instead.", false)]

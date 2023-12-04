@@ -11,11 +11,11 @@
 else
 {
     <ActionLink Action="Log" Class="btn btn-secondary" Text="View Logs" ResourceKey="ViewJobs" />
-    <button type="button" class="btn btn-secondary" @onclick="(async () => await Refresh())">Refresh</button>
+    <button type="button" class="btn btn-secondary" @onclick="(async () => await Refresh())">@Localizer["Refresh.Text"]</button>
     <br />
     <br />
 
-    <Pager Items="@_jobs">
+    <Pager Items="@_jobs" SearchProperties="Name">
         <Header>
             <th style="width: 1px;">&nbsp;</th>
             <th style="width: 1px;">&nbsp;</th>

@@ -13,7 +13,7 @@
 }
 else
 {
-    <ActionLink Action="Add" Text="Install Theme" />
+    <ActionLink Action="Add" Text="Install Theme" ResourceKey="InstallTheme" />
     @((MarkupString)"&nbsp;")
     <ActionLink Action="Create" Text="Create Theme" ResourceKey="CreateTheme" Class="btn btn-secondary" />
 
@@ -23,11 +23,13 @@ else
             <th style="width: 1px;">&nbsp;</th>
             <th>@SharedLocalizer["Name"]</th>
             <th>@SharedLocalizer["Version"]</th>
+            <th>@Localizer["Enabled"]</th>
+            <th>@SharedLocalizer["Support"]</th>
             <th>@SharedLocalizer["Expires"]</th>
             <th>&nbsp;</th>
         </Header>
         <Row>
-            <td><ActionLink Action="View" Parameters="@($"name=" + WebUtility.UrlEncode(context.ThemeName))" ResourceKey="ViewTheme" /></td>
+            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.ThemeId.ToString())" ResourceKey="EditTheme" /></td>
             <td>
 				@if (context.AssemblyName != Constants.ClientId)
                     {
@@ -36,6 +38,19 @@ else
             </td>
             <td>@context.Name</td>
             <td>@context.Version</td>
+            <td>
+                @if (context.IsEnabled)
+                {
+                    <span>@SharedLocalizer["Yes"]</span>
+                }
+                else
+                {
+                    <span>@SharedLocalizer["No"]</span>
+                }
+            </td>
+            <td>
+                @((MarkupString)SupportLink(context.PackageName, context.Version))
+            </td>
             <td>
                 @((MarkupString)PurchaseLink(context.PackageName))
             </td>
@@ -64,7 +79,7 @@ else
         try
         {
             _themes = await ThemeService.GetThemesAsync();
-            _packages = await PackageService.GetPackagesAsync("theme");
+            _packages = await PackageService.GetPackageUpdatesAsync("theme");
         }
         catch (Exception ex)
         {
@@ -85,13 +100,30 @@ else
             if (package != null)
             {
                 if (package.ExpiryDate != null && package.ExpiryDate.Value.Date != DateTime.MaxValue.Date)
-                {
-                    link += "<span>" + package.ExpiryDate.Value.Date.ToString("MMM dd, yyyy") + "</span>";
-                    if (!string.IsNullOrEmpty(package.PaymentUrl))
+                { 
+                    if (string.IsNullOrEmpty(package.PaymentUrl))
                     {
-                        link += "&nbsp;&nbsp;<a class=\"btn btn-primary\" style=\"text-decoration: none !important\" href=\"" + package.PaymentUrl + "\" target=\"_new\">" + SharedLocalizer["Extend"] + "</a>";
+                        link = "<span>" + package.ExpiryDate.Value.Date.ToString("MMM dd, yyyy") + "</span>";
+                    }
+                    else
+                    {
+                        link = "<a class=\"btn btn-primary\" style=\"text-decoration: none !important\" href=\"" + package.PaymentUrl + "\" target=\"_new\">" + package.ExpiryDate.Value.Date.ToString("MMM dd, yyyy") + "</a>";
                     }
                 }
+            }
+        }
+        return link;
+    }
+
+    private string SupportLink(string packagename, string version)
+    {
+        string link = "";
+        if (!string.IsNullOrEmpty(packagename) && _packages != null)
+        {
+            var package = _packages.Where(item => item.PackageId == packagename).FirstOrDefault();
+            if (package != null && !string.IsNullOrEmpty(package.SupportUrl))
+            {
+                link += "<a class=\"btn btn-info\" style=\"text-decoration: none !important\" href=\"" + package.SupportUrl.Replace("{Version}", version) + "\" target=\"_new\">" + SharedLocalizer["Help"] + "</a>";
             }
         }
         return link;
@@ -114,9 +146,8 @@ else
     {
         try
         {
-            await PackageService.DownloadPackageAsync(packagename, version, Constants.PackagesFolder);
+            await PackageService.DownloadPackageAsync(packagename, version);
             await logger.LogInformation("Theme Downloaded {ThemeName} {Version}", packagename, version);
-            await ThemeService.InstallThemesAsync();
             AddModuleMessage(string.Format(Localizer["Success.Theme.Install"], NavigateUrl("admin/system")), MessageType.Success);
         }
         catch (Exception ex)

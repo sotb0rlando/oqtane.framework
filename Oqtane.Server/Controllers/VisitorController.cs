@@ -50,7 +50,7 @@ namespace Oqtane.Controllers
             bool authorized = User.IsInRole(RoleNames.Admin);
             if (!authorized)
             {
-                var visitorCookie = "APP_VISITOR_" + _alias.SiteId.ToString();
+                var visitorCookie = Constants.VisitorCookiePrefix + _alias.SiteId.ToString();
                 if (int.TryParse(Request.Cookies[visitorCookie], out int visitorId))
                 {
                     authorized = (visitorId == id);
@@ -64,8 +64,15 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Visitor Get Attempt {VisitorId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (visitor != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Visitor Get Attempt {VisitorId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }

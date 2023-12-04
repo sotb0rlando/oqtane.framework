@@ -1,5 +1,6 @@
 @namespace Oqtane.Modules.Controls
 @using System.Net
+@using System.Text.Json
 @inherits LocalizableComponent
 @inject IUserService UserService
 
@@ -23,105 +24,135 @@
 }
 
 @code {
-	private string _text = string.Empty;
-	private string _parameters = string.Empty;
-	private string _url = string.Empty;
-	private string _permissions = string.Empty;
-	private bool _editmode = false;
-	private bool _authorized = false;
-	private string _classname = "btn btn-primary";
-	private string _style = string.Empty;
-	private string _iconSpan = string.Empty;
+    private string _text = string.Empty;
+    private int _moduleId = -1;
+    private string _path = string.Empty;
+    private string _parameters = string.Empty;
+    private string _url = string.Empty;
+    private List<Permission> _permissions;
+    private bool _editmode = false;
+    private bool _authorized = false;
+    private string _classname = "btn btn-primary";
+    private string _style = string.Empty;
+    private string _iconSpan = string.Empty;
 
-	[Parameter]
-	public string Action { get; set; } // required
+    [Parameter]
+    public string Action { get; set; } // required
 
-	[Parameter]
-	public string Text { get; set; } // optional - defaults to Action if not specified
+    [Parameter]
+    public string Text { get; set; } // optional - defaults to Action if not specified
 
-	[Parameter]
-	public string Parameters { get; set; } // optional - querystring parameters should be in the form of "id=x&name=y"
+    [Parameter]
+    public int ModuleId { get; set; } = -1; // optional - allows the link to target a specific moduleid
 
-	[Parameter]
-	public int ModuleId { get; set; } = -1; // optional - allows the link to target a specific moduleid
+    [Parameter]
+    public string Path { get; set; } = null; // optional - allows the link to target a specific page
 
-	[Parameter]
-	public Action OnClick { get; set; } = null; // optional - executes a method in the calling component
+    [Parameter]
+    public string Parameters { get; set; } // optional - querystring parameters should be in the form of "id=x&name=y"
 
-	[Parameter]
-	public SecurityAccessLevel? Security { get; set; } // optional - can be used to explicitly specify SecurityAccessLevel
+    [Parameter]
+    public Action OnClick { get; set; } = null; // optional - executes a method in the calling component
 
-	[Parameter]
-	public string Permissions { get; set; } // optional - can be used to specify a permission string
+    [Parameter]
+    public SecurityAccessLevel? Security { get; set; } // optional - can be used to explicitly specify SecurityAccessLevel
 
-	[Parameter]
-	public bool Disabled { get; set; } // optional
+    [Parameter]
+    public string Permissions { get; set; } // deprecated - use PermissionList instead
 
-	[Parameter]
-	public string EditMode { get; set; } // optional - specifies if an authorized user must be in edit mode to see the action - default is false.
+    [Parameter]
+    public List<Permission> PermissionList { get; set; } // optional - can be used to specify permissions
 
-	[Parameter]
-	public string Class { get; set; } // optional - defaults to primary if not specified
+    [Parameter]
+    public bool Disabled { get; set; } // optional
 
-	[Parameter]
-	public string Style { get; set; } // optional
+    [Parameter]
+    public string EditMode { get; set; } // optional - specifies if an authorized user must be in edit mode to see the action - default is false.
 
-	[Parameter]
-	public string IconName { get; set; } // optional - specifies an icon for the link - default is no icon
+    [Parameter]
+    public string Class { get; set; } // optional - defaults to primary if not specified
 
-	[Parameter]
-	public bool IconOnly { get; set; } // optional - specifies only icon in link
+    [Parameter]
+    public string Style { get; set; } // optional
 
-	[Parameter]
-	public string ReturnUrl { get; set; } // optional - used to set a url to redirect to
+    [Parameter]
+    public string IconName { get; set; } // optional - specifies an icon for the link - default is no icon
 
-	protected override void OnParametersSet()
-	{
-		base.OnParametersSet();
+    [Parameter]
+    public bool IconOnly { get; set; } // optional - specifies only icon in link
 
-		_text = Action;
-		if (!string.IsNullOrEmpty(Text))
-		{
-			_text = Text;
-		}
+    [Parameter]
+    public string ReturnUrl { get; set; } // optional - used to set a url to redirect to
 
-		if (IconOnly && !string.IsNullOrEmpty(IconName))
-		{
-			_text = string.Empty;
-		}
 
-		if (!string.IsNullOrEmpty(Parameters))
-		{
-			_parameters = Parameters;
-		}
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(Permissions))
+        {
+            PermissionList = JsonSerializer.Deserialize<List<Permission>>(Permissions);
+        }
+    }
 
-		if (!string.IsNullOrEmpty(Class))
-		{
-			_classname = Class;
-		}
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
 
-		if (!string.IsNullOrEmpty(Style))
-		{
-			_style = Style;
-		}
+        _text = Action;
+        if (!string.IsNullOrEmpty(Text))
+        {
+            _text = Text;
+        }
 
-		if (!string.IsNullOrEmpty(EditMode))
-		{
-			_editmode = bool.Parse(EditMode);
-		}
+        if (IconOnly && !string.IsNullOrEmpty(IconName))
+        {
+            _text = string.Empty;
+        }
 
-		if (!string.IsNullOrEmpty(IconName))
-		{
-			if (!IconName.Contains(" "))
-			{
-				IconName = "oi oi-" + IconName;
-			}
-			_iconSpan = $"<span class=\"{IconName}\"></span>{(IconOnly ? "" : "&nbsp")}";
-		}
+        _moduleId = ModuleState.ModuleId;
+        if (ModuleId != -1)
+        {
+            _moduleId = ModuleId;
+        }
 
-		_permissions = (string.IsNullOrEmpty(Permissions)) ? ModuleState.Permissions : Permissions;
+        _path = PageState.Page.Path;
+        if (Path != null)
+        {
+            _path = Path;
+        }
+
+        if (!string.IsNullOrEmpty(Parameters))
+        {
+            _parameters = Parameters;
+        }
+
+        if (!string.IsNullOrEmpty(Class))
+        {
+            _classname = Class;
+        }
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            _style = Style;
+        }
+
+        if (!string.IsNullOrEmpty(EditMode))
+        {
+            _editmode = bool.Parse(EditMode);
+        }
+
+        if (!string.IsNullOrEmpty(IconName))
+        {
+            if (!IconName.Contains(" "))
+            {
+                IconName = "oi oi-" + IconName;
+            }
+            _iconSpan = $"<span class=\"{IconName}\"></span>{(IconOnly ? "" : "&nbsp")}";
+        }
+
+		_permissions = (PermissionList == null) ? ModuleState.PermissionList : PermissionList;
 		_text = Localize(nameof(Text), _text);
-		_url = (ModuleId == -1) ? EditUrl(Action, _parameters) : EditUrl(ModuleId, Action, _parameters);
+
+		_url = EditUrl(_path, _moduleId, Action, _parameters);
 		if (!string.IsNullOrEmpty(ReturnUrl))
 		{
 			_url += ((_url.Contains("?")) ? "&" : "?") + $"returnurl={WebUtility.UrlEncode(ReturnUrl)}";

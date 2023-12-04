@@ -21,6 +21,7 @@ namespace Oqtane.Controllers
     {
         private readonly ISiteRepository _sites;
         private readonly IPageRepository _pages;
+        private readonly IThemeRepository _themes;
         private readonly IModuleRepository _modules;
         private readonly IPageModuleRepository _pageModules;
         private readonly IModuleDefinitionRepository _moduleDefinitions;
@@ -32,10 +33,11 @@ namespace Oqtane.Controllers
         private readonly IMemoryCache _cache;
         private readonly Alias _alias;
 
-        public SiteController(ISiteRepository sites, IPageRepository pages, IModuleRepository modules, IPageModuleRepository pageModules, IModuleDefinitionRepository moduleDefinitions, ILanguageRepository languages, IUserPermissions userPermissions, ISettingRepository settings, ITenantManager tenantManager, ISyncManager syncManager, ILogManager logger, IMemoryCache cache)
+        public SiteController(ISiteRepository sites, IPageRepository pages, IThemeRepository themes, IModuleRepository modules, IPageModuleRepository pageModules, IModuleDefinitionRepository moduleDefinitions, ILanguageRepository languages, IUserPermissions userPermissions, ISettingRepository settings, ITenantManager tenantManager, ISyncManager syncManager, ILogManager logger, IMemoryCache cache)
         {
             _sites = sites;
             _pages = pages;
+            _themes = themes;
             _modules = modules;
             _pageModules = pageModules;
             _moduleDefinitions = moduleDefinitions;
@@ -77,7 +79,7 @@ namespace Oqtane.Controllers
         private Site GetSite(int siteid)
         {
             var site = _sites.GetSite(siteid);
-            if (site.SiteId == _alias.SiteId)
+            if (site != null && site.SiteId == _alias.SiteId)
             {
                 // site settings
                 site.Settings = _settings.GetSettings(EntityNames.Site, site.SiteId)
@@ -89,10 +91,10 @@ namespace Oqtane.Controllers
                 site.Pages = new List<Page>();
                 foreach (Page page in _pages.GetPages(site.SiteId))
                 {
-                    if (_userPermissions.IsAuthorized(User, PermissionNames.View, page.Permissions))
+                    if (!page.IsDeleted && _userPermissions.IsAuthorized(User, PermissionNames.View, page.PermissionList))
                     {
                         page.Settings = settings.Where(item => item.EntityId == page.PageId)
-                            .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, page.Permissions))
+                            .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, page.PermissionList))
                             .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue);
                         site.Pages.Add(page);
                     }
@@ -105,13 +107,13 @@ namespace Oqtane.Controllers
                 site.Modules = new List<Module>();
                 foreach (PageModule pagemodule in _pageModules.GetPageModules(site.SiteId))
                 {
-                    if (_userPermissions.IsAuthorized(User, PermissionNames.View, pagemodule.Module.Permissions))
+                    if (!pagemodule.IsDeleted && _userPermissions.IsAuthorized(User, PermissionNames.View, pagemodule.Module.PermissionList))
                     {
                         Module module = new Module();
                         module.SiteId = pagemodule.Module.SiteId;
                         module.ModuleDefinitionName = pagemodule.Module.ModuleDefinitionName;
                         module.AllPages = pagemodule.Module.AllPages;
-                        module.Permissions = pagemodule.Module.Permissions;
+                        module.PermissionList = pagemodule.Module.PermissionList;
                         module.CreatedBy = pagemodule.Module.CreatedBy;
                         module.CreatedOn = pagemodule.Module.CreatedOn;
                         module.ModifiedBy = pagemodule.Module.ModifiedBy;
@@ -128,26 +130,38 @@ namespace Oqtane.Controllers
                         module.Order = pagemodule.Order;
                         module.ContainerType = pagemodule.ContainerType;
 
-                        module.ModuleDefinition = moduledefinitions.Find(item => item.ModuleDefinitionName == module.ModuleDefinitionName);
+                        module.ModuleDefinition = _moduleDefinitions.FilterModuleDefinition(moduledefinitions.Find(item => item.ModuleDefinitionName == module.ModuleDefinitionName));
+
                         module.Settings = settings.Where(item => item.EntityId == pagemodule.ModuleId)
-                            .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, pagemodule.Module.Permissions))
+                            .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, pagemodule.Module.PermissionList))
                             .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue);
 
                         site.Modules.Add(module);
                     }
                 }
+                site.Modules = site.Modules.OrderBy(item => item.PageId).ThenBy(item => item.Pane).ThenBy(item => item.Order).ToList();
 
                 // languages
                 site.Languages = _languages.GetLanguages(site.SiteId).ToList();
                 var defaultCulture = CultureInfo.GetCultureInfo(Constants.DefaultCulture);
                 site.Languages.Add(new Language { Code = defaultCulture.Name, Name = defaultCulture.DisplayName, Version = Constants.Version, IsDefault = !site.Languages.Any(l => l.IsDefault) });
 
+                // themes
+                site.Themes = _themes.FilterThemes(_themes.GetThemes().ToList());
+
                 return site;
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Site Get Attempt {SiteId}", siteid);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (site != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Site Get Attempt {SiteId}", siteid);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -178,7 +192,7 @@ namespace Oqtane.Controllers
         public Site Put(int id, [FromBody] Site site)
         {
             var current = _sites.GetSite(site.SiteId, false);
-            if (ModelState.IsValid && site.SiteId == _alias.SiteId && site.TenantId == _alias.TenantId && current != null)
+            if (ModelState.IsValid && site.SiteId == _alias.SiteId && site.TenantId == _alias.TenantId && site.SiteId == id && current != null)
             {
                 site = _sites.UpdateSite(site);
                 _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Site, site.SiteId, SyncEventActions.Update);
@@ -239,7 +253,7 @@ namespace Oqtane.Controllers
                 foreach (Page child in children)
                 {
                     child.Level = level + 1;
-                    child.HasChildren = pages.Any(item => item.ParentId == child.PageId);
+                    child.HasChildren = pages.Any(item => item.ParentId == child.PageId && !item.IsDeleted && item.IsNavigation);
                     hierarchy.Add(child);
                     getPath(pageList, child);
                 }

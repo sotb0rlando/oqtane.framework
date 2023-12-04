@@ -5,11 +5,11 @@ using Microsoft.AspNetCore.Http;
 using Oqtane.Shared;
 using Oqtane.Enums;
 using Oqtane.Infrastructure;
-using [Owner].[Module].Repository;
+using [Owner].Module.[Module].Repository;
 using Oqtane.Controllers;
 using System.Net;
 
-namespace [Owner].[Module].Controllers
+namespace [Owner].Module.[Module].Controllers
 {
     [Route(ControllerRoutes.ApiRoute)]
     public class [Module]Controller : ModuleControllerBase
@@ -81,7 +81,7 @@ namespace [Owner].[Module].Controllers
         [Authorize(Policy = PolicyNames.EditModule)]
         public Models.[Module] Put(int id, [FromBody] Models.[Module] [Module])
         {
-            if (ModelState.IsValid && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId) && _[Module]Repository.Get[Module]([Module].[Module]Id, false) != null)
+            if (ModelState.IsValid && [Module].[Module]Id == id && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId) && _[Module]Repository.Get[Module]([Module].[Module]Id, false) != null)
             {
                 [Module] = _[Module]Repository.Update[Module]([Module]);
                 _logger.Log(LogLevel.Information, this, LogFunction.Update, "[Module] Updated {[Module]}", [Module]);

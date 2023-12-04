@@ -1,4 +1,5 @@
 @namespace Oqtane.Modules.Admin.Users
+@using System.Text.RegularExpressions;
 @inherits ModuleBase
 @inject NavigationManager NavigationManager
 @inject IUserService UserService
@@ -8,18 +9,11 @@
 @inject IStringLocalizer<Edit> Localizer
 @inject IStringLocalizer<SharedResources> SharedLocalizer
 
-@if (PageState.User != null && photo != null)
+@if (_initialized)
 {
-    <img src="@photo.Url" alt="@displayname" style="max-width: 400px" class="rounded-circle mx-auto d-block">
-}
-else
-{
-    <br />
-}
-<TabStrip>
-    <TabPanel Name="Identity" ResourceKey="Identity">
-        @if (profiles != null)
-        {
+    <TabStrip>
+        <TabPanel Name="Identity" ResourceKey="Identity">
+            <ModuleMessage Message="@_passwordrequirements" Type="MessageType.Info" />
             <div class="container">
                 <div class="row mb-1 align-items-center">
                     <Label Class="col-sm-3" For="username" HelpText="The unique username for a user. Note that this field can not be modified." ResourceKey="Username"></Label>
@@ -29,20 +23,20 @@ else
                 </div>
                 <div class="row mb-1 align-items-center">
                     <Label Class="col-sm-3" For="password" HelpText="The user's password. Please choose a password which is sufficiently secure." ResourceKey="Password"></Label>
-					<div class="col-sm-9">
+                    <div class="col-sm-9">
                         <div class="input-group">
-						    <input id="password" type="@_passwordtype" class="form-control" @bind="@_password" autocomplete="new-password" />
-						    <button type="button" class="btn btn-secondary" @onclick="@TogglePassword">@_togglepassword</button>
-					    </div>
+                            <input id="password" type="@_passwordtype" class="form-control" @bind="@_password" autocomplete="new-password" />
+                            <button type="button" class="btn btn-secondary" @onclick="@TogglePassword" tabindex="-1">@_togglepassword</button>
+                        </div>
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
                     <Label Class="col-sm-3" For="confirm" HelpText="Please enter the password again to confirm it matches with the value above" ResourceKey="Confirm"></Label>
                     <div class="col-sm-9">
                         <div class="input-group">
-							<input id="confirm" type="@_passwordtype" class="form-control" @bind="@confirm" autocomplete="new-password" />
-						    <button type="button" class="btn btn-secondary" @onclick="@TogglePassword">@_togglepassword</button>
-					    </div>
+                            <input id="confirm" type="@_passwordtype" class="form-control" @bind="@confirm" autocomplete="new-password" />
+                            <button type="button" class="btn btn-secondary" @onclick="@TogglePassword" tabindex="-1">@_togglepassword</button>
+                        </div>
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
@@ -55,12 +49,6 @@ else
                     <Label Class="col-sm-3" For="displayname" HelpText="The full name of the user" ResourceKey="DisplayName"></Label>
                     <div class="col-sm-9">
                         <input id="displayname" class="form-control" @bind="@displayname" />
-                    </div>
-                </div>
-                <div class="row mb-1 align-items-center">
-                    <Label Class="col-sm-3" For="@photofileid.ToString()" HelpText="A photo of the user" ResourceKey="Photo"></Label>
-                    <div class="col-sm-9">
-                        <FileManager FileId="@photofileid" @ref="filemanager" />
                     </div>
                 </div>
                 <div class="row mb-1 align-items-center">
@@ -85,11 +73,8 @@ else
                     </div>
                 </div>
             </div>
-        }
-    </TabPanel>
-    <TabPanel Name="Profile" ResourceKey="Profile">
-        @if (profiles != null)
-        {
+        </TabPanel>
+        <TabPanel Name="Profile" ResourceKey="Profile">
             <div class="container">
                 <div class="row mb-1 align-items-center">
                     @foreach (Profile profile in profiles)
@@ -104,8 +89,8 @@ else
                         }
                         <div class="row mb-1 align-items-center">
                             <Label Class="col-sm-3" For="@p.Name" HelpText="@p.Description">@p.Title</Label>
-                            <div class="col-sm-9">
-                                @if (!string.IsNullOrEmpty(p.Options))
+                                <div class="col-sm-9">
+                                    @if (!string.IsNullOrEmpty(p.Options))
                                 {
                                     <select id="@p.Name" class="form-select" @onchange="@(e => ProfileChanged(e, p.Name))">
                                         @foreach (var option in p.Options.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
@@ -123,13 +108,13 @@ else
                                 }
                                 else
                                 {
-                                    @if (p.IsRequired)
+                                    @if (p.Rows == 1)
                                     {
-                                        <input id="@p.Name" class="form-control" maxlength="@p.MaxLength" value="@GetProfileValue(p.Name, p.DefaultValue)" required @onchange="@(e => ProfileChanged(e, p.Name))" />
+                                        <input id="@p.Name" class="form-control" maxlength="@p.MaxLength" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))" />
                                     }
                                     else
                                     {
-                                        <input id="@p.Name" class="form-control" maxlength="@p.MaxLength" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))" />
+                                        <textarea id="@p.Name" class="form-control" maxlength="@p.MaxLength" rows="@p.Rows" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))"></textarea>
                                     }
                                 }
                             </div>
@@ -137,128 +122,130 @@ else
                     }
                 </div>
             </div>
+        </TabPanel>
+    </TabStrip>
+
+    <button type="button" class="btn btn-success" @onclick="SaveUser">@SharedLocalizer["Save"]</button>
+    <NavLink class="btn btn-secondary" href="@NavigateUrl()">@SharedLocalizer["Cancel"]</NavLink>
+    <br />
+    <br />
+    <AuditInfo CreatedBy="@createdby" CreatedOn="@createdon" ModifiedBy="@modifiedby" ModifiedOn="@modifiedon" DeletedBy="@deletedby" DeletedOn="@deletedon"></AuditInfo>
+}
+
+ @code {
+    private bool _initialized = false;
+    private string _passwordrequirements;
+    private int userid;
+    private string username = string.Empty;
+    private string _password = string.Empty;
+    private string _passwordtype = "password";
+    private string _togglepassword = string.Empty;
+    private string confirm = string.Empty;
+    private string email = string.Empty;
+    private string displayname = string.Empty;
+    private string isdeleted;
+    private string lastlogin;
+    private string lastipaddress;
+
+    private List<Profile> profiles;
+    private Dictionary<string, string> settings;
+    private string category = string.Empty;
+
+    private string createdby;
+    private DateTime createdon;
+    private string modifiedby;
+    private DateTime modifiedon;
+    private string deletedby;
+    private DateTime? deletedon;
+
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _passwordrequirements = await UserService.GetPasswordRequirementsAsync(PageState.Site.SiteId);
+            _togglepassword = SharedLocalizer["ShowPassword"];
+            profiles = await ProfileService.GetProfilesAsync(PageState.Site.SiteId);
+
+            if (PageState.QueryString.ContainsKey("id") && int.TryParse(PageState.QueryString["id"], out int UserId))
+            {
+                userid = UserId;
+                var user = await UserService.GetUserAsync(userid, PageState.Site.SiteId);
+                if (user != null)
+                {
+                    username = user.Username;
+                    email = user.Email;
+                    displayname = user.DisplayName;
+                    isdeleted = user.IsDeleted.ToString();
+                    lastlogin = string.Format("{0:MMM dd yyyy HH:mm:ss}", user.LastLoginOn);
+                    lastipaddress = user.LastIPAddress;
+
+                    settings = await SettingService.GetUserSettingsAsync(user.UserId);
+                    createdby = user.CreatedBy;
+                    createdon = user.CreatedOn;
+                    modifiedby = user.ModifiedBy;
+                    modifiedon = user.ModifiedOn;
+                    deletedby = user.DeletedBy;
+                    deletedon = user.DeletedOn;
+                }
+            }
+
+            _initialized = true;
         }
-    </TabPanel>
-</TabStrip>
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading User {UserId} {Error}", userid, ex.Message);
+            AddModuleMessage(Localizer["Error.User.Load"], MessageType.Error);
+        }
+    }
 
-<button type="button" class="btn btn-success" @onclick="SaveUser">@SharedLocalizer["Save"]</button>
-<NavLink class="btn btn-secondary" href="@NavigateUrl()">@SharedLocalizer["Cancel"]</NavLink>
-<br />
-<br />
-<AuditInfo CreatedBy="@createdby" CreatedOn="@createdon" ModifiedBy="@modifiedby" ModifiedOn="@modifiedon" DeletedBy="@deletedby" DeletedOn="@deletedon"></AuditInfo>
+    private string GetProfileValue(string SettingName, string DefaultValue)
+    {
+        string value = SettingService.GetSetting(settings, SettingName, DefaultValue);
+        if (value.Contains("]"))
+        {
+            value = value.Substring(value.IndexOf("]") + 1);
+        }
+        return value;
+    }
 
-@code {
-	private int userid;
-	private string username = string.Empty;
-	private string _password = string.Empty;
-	private string _passwordtype = "password";
-	private string _togglepassword = string.Empty;
-	private string confirm = string.Empty;
-	private string email = string.Empty;
-	private string displayname = string.Empty;
-	private FileManager filemanager;
-	private int photofileid = -1;
-	private File photo = null;
-	private string isdeleted;
-	private string lastlogin;
-	private string lastipaddress;
+    private async Task SaveUser()
+    {
+        try
+        {
+            if (username != string.Empty && email != string.Empty)
+            {
+                if (_password == confirm)
+                {
+                    if (ValidateProfiles())
+                    {
+                        var user = await UserService.GetUserAsync(userid, PageState.Site.SiteId);
+                        user.SiteId = PageState.Site.SiteId;
+                        user.Username = username;
+                        user.Password = _password;
+                        user.Email = email;
+                        user.DisplayName = string.IsNullOrWhiteSpace(displayname) ? username : displayname;
+                        user.PhotoFileId = null;
+                        if (user.PhotoFileId == -1)
+                        {
+                            user.PhotoFileId = null;
+                        }
 
-	private List<Profile> profiles;
-	private Dictionary<string, string> settings;
-	private string category = string.Empty;
+                        user.IsDeleted = (isdeleted == null ? true : Boolean.Parse(isdeleted));
 
-	private string createdby;
-	private DateTime createdon;
-	private string modifiedby;
-	private DateTime modifiedon;
-	private string deletedby;
-	private DateTime? deletedon;
-
-	public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Admin;
-
-	protected override async Task OnParametersSetAsync()
-	{
-		try
-		{
-			if (PageState.QueryString.ContainsKey("id"))
-			{
-				_togglepassword = SharedLocalizer["ShowPassword"];
-				profiles = await ProfileService.GetProfilesAsync(PageState.Site.SiteId);
-				userid = Int32.Parse(PageState.QueryString["id"]);
-				var user = await UserService.GetUserAsync(userid, PageState.Site.SiteId);
-				if (user != null)
-				{
-					username = user.Username;
-					email = user.Email;
-					displayname = user.DisplayName;
-					if (user.PhotoFileId != null)
-					{
-						photofileid = user.PhotoFileId.Value;
-						photo = await FileService.GetFileAsync(photofileid);
-					}
-					else
-					{
-						photofileid = -1;
-						photo = null;
-					}
-					isdeleted = user.IsDeleted.ToString();
-					lastlogin = string.Format("{0:MMM dd yyyy HH:mm:ss}", user.LastLoginOn);
-					lastipaddress = user.LastIPAddress;
-
-					settings = await SettingService.GetUserSettingsAsync(user.UserId);
-					createdby = user.CreatedBy;
-					createdon = user.CreatedOn;
-					modifiedby = user.ModifiedBy;
-					modifiedon = user.ModifiedOn;
-					deletedby = user.DeletedBy;
-					deletedon = user.DeletedOn;
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			await logger.LogError(ex, "Error Loading User {UserId} {Error}", userid, ex.Message);
-			AddModuleMessage(Localizer["Error.User.Load"], MessageType.Error);
-		}
-	}
-
-	private string GetProfileValue(string SettingName, string DefaultValue)
-		=> SettingService.GetSetting(settings, SettingName, DefaultValue);
-
-	private async Task SaveUser()
-	{
-		try
-		{
-			if (username != string.Empty && email != string.Empty && ValidateProfiles())
-			{
-				if (_password == confirm)
-				{
-					var user = await UserService.GetUserAsync(userid, PageState.Site.SiteId);
-					user.SiteId = PageState.Site.SiteId;
-					user.Username = username;
-					user.Password = _password;
-					user.Email = email;
-					user.DisplayName = string.IsNullOrWhiteSpace(displayname) ? username : displayname;
-					user.PhotoFileId = null;
-					user.PhotoFileId = filemanager.GetFileId();
-					if (user.PhotoFileId == -1)
-					{
-						user.PhotoFileId = null;
-					}
-
-					user.IsDeleted = (isdeleted == null ? true : Boolean.Parse(isdeleted));
-
-					user = await UserService.UpdateUserAsync(user);
-					if (user != null)
-					{
-						await SettingService.UpdateUserSettingsAsync(settings, user.UserId);
-						await logger.LogInformation("User Saved {User}", user);
-						NavigationManager.NavigateTo(NavigateUrl());
-					}
-					else
-					{
-						AddModuleMessage(Localizer["Message.Password.Complexity"], MessageType.Error);
-					}
+                        user = await UserService.UpdateUserAsync(user);
+                        if (user != null)
+                        {
+                            await SettingService.UpdateUserSettingsAsync(settings, user.UserId);
+                            await logger.LogInformation("User Saved {User}", user);
+                            NavigationManager.NavigateTo(NavigateUrl());
+                        }
+                        else
+                        {
+                            AddModuleMessage(Localizer["Message.Password.Complexity"], MessageType.Error);
+                        }
+                    }
                 }
                 else
                 {
@@ -279,19 +266,33 @@ else
 
     private bool ValidateProfiles()
     {
-        bool valid = true;
         foreach (Profile profile in profiles)
         {
-            if (string.IsNullOrEmpty(SettingService.GetSetting(settings, profile.Name, string.Empty)) && !string.IsNullOrEmpty(profile.DefaultValue))
+            var value = GetProfileValue(profile.Name, string.Empty);
+            if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(profile.DefaultValue))
             {
                 settings = SettingService.SetSetting(settings, profile.Name, profile.DefaultValue);
             }
-            if (profile.IsRequired && string.IsNullOrEmpty(SettingService.GetSetting(settings, profile.Name, string.Empty)))
+            if (!profile.IsPrivate || UserSecurity.IsAuthorized(PageState.User, RoleNames.Admin))
             {
-                valid = false;
+                if (profile.IsRequired && string.IsNullOrEmpty(value))
+                {
+                    AddModuleMessage(string.Format(SharedLocalizer["ProfileRequired"], profile.Title), MessageType.Warning);
+                    return false;
+                }
+                if (!string.IsNullOrEmpty(profile.Validation))
+                {
+                    Regex regex = new Regex(profile.Validation);
+                    bool valid = regex.Match(value).Success;
+                    if (!valid)
+                    {
+                        AddModuleMessage(string.Format(SharedLocalizer["ProfileInvalid"], profile.Title), MessageType.Warning);
+                        return false;
+                    }
+                }
             }
         }
-        return valid;
+        return true;
     }
 
     private void ProfileChanged(ChangeEventArgs e, string SettingName)

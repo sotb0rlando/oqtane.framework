@@ -196,7 +196,7 @@
     <value>Information</value>
   </data>
   <data name="PackageName.HelpText" xml:space="preserve">
-    <value>The unique name of the package from which this module was installed</value>
+    <value>The unique name of the package from which this module was installed. This value must be specified within the module's IModule interface specification.</value>
   </data>
   <data name="PackageName.Text" xml:space="preserve">
     <value>Package Name:</value>
@@ -211,12 +211,33 @@
     <value>No Translations Exist For This Module Or Package Service Is Disabled</value>
   </data>
   <data name="Success.Translation.Download" xml:space="preserve">
-    <value>Translation Downloaded Successfully. Click Install To Complete Installation.</value>
-  </data>
-  <data name="Success.Translation.Install" xml:space="preserve">
-    <value>Translation Installed Successfully. You Must &lt;a href={0}&gt;Restart&lt;/a&gt; Your Application To Apply These Changes.</value>
+    <value>Translation Package Saved Successfully. You Must &lt;a href={0}&gt;Restart&lt;/a&gt; Your Application To Complete The Installation.</value>
   </data>
   <data name="Translations.Heading" xml:space="preserve">
     <value>Translations</value>
+  </data>
+  <data name="Message.DuplicateName" xml:space="preserve">
+    <value>A Module With The Name Specified Already Exists</value>
+  </data>
+  <data name="IsEnabled.HelpText" xml:space="preserve">
+    <value>Is module enabled for this site?</value>
+  </data>
+  <data name="IsEnabled.Text" xml:space="preserve">
+    <value>Enabled?</value>
+  </data>
+  <data name="View License" xml:space="preserve">
+    <value>View License</value>
+  </data>
+  <data name="Error.Validate" xml:space="preserve">
+    <value>Error Validating Package</value>
+  </data>
+  <data name="Message.Download" xml:space="preserve">
+    <value>Package Version Has Been Verified. Please Select The Download Button To Obtain The Package.</value>
+  </data>
+  <data name="Message.Validate" xml:space="preserve">
+    <value>This Package Version Has Not Been Registered In The Oqtane Marketplace Or You Do Not Have The Right To Use It From This Installation</value>
+  </data>
+  <data name="Validate" xml:space="preserve">
+    <value>Validate</value>
   </data>
 </root>

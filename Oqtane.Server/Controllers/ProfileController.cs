@@ -28,7 +28,7 @@ namespace Oqtane.Controllers
 
         // GET: api/<controller>?siteid=x
         [HttpGet]
-        [Authorize(Policy = $"{EntityNames.Profile}:{PermissionNames.Read}:{RoleNames.Registered}")]
+        [Authorize(Roles = RoleNames.Registered)]
         public IEnumerable<Profile> Get(string siteid)
         {
             int SiteId;
@@ -46,7 +46,7 @@ namespace Oqtane.Controllers
 
         // GET api/<controller>/5
         [HttpGet("{id}")]
-        [Authorize(Policy = $"{EntityNames.Profile}:{PermissionNames.Read}:{RoleNames.Registered}")]
+        [Authorize(Roles = RoleNames.Registered)]
         public Profile Get(int id)
         {
             var profile = _profiles.GetProfile(id);
@@ -56,8 +56,15 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Profile Get Attempt {ProfileId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (profile != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Profile Get Attempt {ProfileId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -87,7 +94,7 @@ namespace Oqtane.Controllers
         [Authorize(Policy = $"{EntityNames.Profile}:{PermissionNames.Write}:{RoleNames.Admin}")]
         public Profile Put(int id, [FromBody] Profile profile)
         {
-            if (ModelState.IsValid && profile.SiteId == _alias.SiteId && _profiles.GetProfile(profile.ProfileId, false) != null)
+            if (ModelState.IsValid && profile.SiteId == _alias.SiteId && profile.ProfileId == id && _profiles.GetProfile(profile.ProfileId, false) != null)
             {
                 profile = _profiles.UpdateProfile(profile);
                 _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Profile, profile.ProfileId, SyncEventActions.Update);

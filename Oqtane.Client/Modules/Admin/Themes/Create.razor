@@ -80,7 +80,10 @@
 
     protected override void OnInitialized()
     {
-        AddModuleMessage(Localizer["Info.Theme.CreatorIntent"], MessageType.Info);
+        if (!NavigationManager.BaseUri.Contains("localhost:"))
+        {
+            AddModuleMessage(Localizer["Info.Theme.CreatorIntent"], MessageType.Info);
+        }
     }
 	
 	protected override async Task OnParametersSetAsync()
@@ -102,7 +105,8 @@
         {
             if (IsValid(_owner) && IsValid(_theme) && _owner != _theme && _template != "-")
             {
-                var theme = new Theme { Owner = _owner, Name = _theme, Template = _template, Version = _reference };
+                var template = _templates.FirstOrDefault(item => item.Name == _template);
+                var theme = new Theme { Owner = _owner, Name = _theme, Template = _template, Version = _reference, ThemeName = template.Namespace };
                 theme = await ThemeService.CreateThemeAsync(theme);
                 GetLocation();
                 AddModuleMessage(string.Format(Localizer["Success.Theme.Create"], NavigateUrl("admin/system")), MessageType.Success);
@@ -121,7 +125,7 @@
     private bool IsValid(string name)
     {
         // must contain letters, underscores and digits and first character must be letter or underscore
-        return !string.IsNullOrEmpty(name) && name.ToLower() != "theme" && Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$");
+		return !string.IsNullOrEmpty(name) && name.ToLower() != "theme" && !name.ToLower().Contains("oqtane") && Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$");
     }
 
     private void TemplateChanged(ChangeEventArgs e)
@@ -142,8 +146,14 @@
         if (_owner != "" && _theme != "" && _template != "-")
         {
             var template = _templates.FirstOrDefault(item => item.Name == _template);
-            _location = template.Location + _owner + "." + _theme;
-
+            if (!string.IsNullOrEmpty(template.Namespace))
+            {
+                _location = template.Location + template.Namespace.Replace("[Owner]", _owner).Replace("[Theme]", _theme);
+            }
+            else
+            {
+                _location = template.Location + _owner + ".Theme." + _theme;
+            }
         }
         StateHasChanged();
     }

@@ -46,7 +46,7 @@ namespace Oqtane.Controllers
             _identityCache = identityCache;
             _logger = logger;
             _alias = tenantManager.GetAlias();
-            _visitorCookie = "APP_VISITOR_" + _alias.SiteId.ToString();
+            _visitorCookie = Constants.VisitorCookiePrefix + _alias.SiteId.ToString();
         }
 
         // GET: api/<controller>
@@ -64,8 +64,12 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Read, "User Not Authorized To Access Settings {EntityName} {EntityId}", entityName, entityId);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                // suppress unauthorized visitor logging as it is usually caused by clients that do not support cookies 
+                if (entityName != EntityNames.Visitor) 
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Read, "User Not Authorized To Access Settings {EntityName} {EntityId}", entityName, entityId);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
             }
             return settings;
         }
@@ -85,8 +89,15 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Read, "User Not Authorized To Access Setting {EntityName} {SettingId}", entityName, id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (setting != null && entityName != EntityNames.Visitor)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Read, "User Not Authorized To Access Setting {EntityName} {SettingId}", entityName, id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -103,8 +114,11 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Create, "User Not Authorized To Add Setting {Setting}", setting);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (setting.EntityName != EntityNames.Visitor)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Create, "User Not Authorized To Add Setting {Setting}", setting);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
                 setting = null;
             }
             return setting;
@@ -114,7 +128,7 @@ namespace Oqtane.Controllers
         [HttpPut("{id}")]
         public Setting Put(int id, [FromBody] Setting setting)
         {
-            if (ModelState.IsValid && IsAuthorized(setting.EntityName, setting.EntityId, PermissionNames.Edit))
+            if (ModelState.IsValid && setting.SettingId == id && IsAuthorized(setting.EntityName, setting.EntityId, PermissionNames.Edit))
             {
                 setting = _settings.UpdateSetting(setting);
                 AddSyncEvent(setting.EntityName, setting.SettingId, SyncEventActions.Update);
@@ -122,8 +136,11 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Update, "User Not Authorized To Update Setting {Setting}", setting);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (setting.EntityName != EntityNames.Visitor)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Update, "User Not Authorized To Update Setting {Setting}", setting);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
                 setting = null;
             }
             return setting;
@@ -142,8 +159,11 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Delete, "User Not Authorized To Delete Setting {Setting}", setting);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (entityName != EntityNames.Visitor)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Delete, "User Not Authorized To Delete Setting {Setting}", setting);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
             }
         }
 
@@ -184,6 +204,8 @@ namespace Oqtane.Controllers
                 case EntityNames.Tenant:
                 case EntityNames.ModuleDefinition:
                 case EntityNames.Host:
+                case EntityNames.Job:
+                case EntityNames.Theme:
                     if (permissionName == PermissionNames.Edit)
                     {
                         authorized = User.IsInRole(RoleNames.Host);
@@ -212,13 +234,14 @@ namespace Oqtane.Controllers
                     authorized = true;
                     if (permissionName == PermissionNames.Edit)
                     {
-                        authorized = User.IsInRole(RoleNames.Admin) || (_userPermissions.GetUser(User).UserId == entityId);
+                        authorized = _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin) || (_userPermissions.GetUser(User).UserId == entityId);
                     }
                     break;
                 case EntityNames.Visitor:
                     authorized = User.IsInRole(RoleNames.Admin);
                     if (!authorized)
                     {
+                        // a visitor may have cookies disabled
                         if (int.TryParse(Request.Cookies[_visitorCookie], out int visitorId))
                         {
                             authorized = (visitorId == entityId);
@@ -226,13 +249,11 @@ namespace Oqtane.Controllers
                     }
                     break;
                 default: // custom entity
+                    authorized = true;
                     if (permissionName == PermissionNames.Edit)
                     {
-                        authorized = User.IsInRole(RoleNames.Admin) || _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, entityId, permissionName);
-                    }
-                    else
-                    {
-                        authorized = true;
+                        authorized = _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, entityId, permissionName) ||
+                            _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin);
                     }
                     break;
             }
@@ -247,6 +268,8 @@ namespace Oqtane.Controllers
                 case EntityNames.Tenant:
                 case EntityNames.ModuleDefinition:
                 case EntityNames.Host:
+                case EntityNames.Job:
+                case EntityNames.Theme:
                     filter = !User.IsInRole(RoleNames.Host);
                     break;
                 case EntityNames.Site:

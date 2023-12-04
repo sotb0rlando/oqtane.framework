@@ -8,17 +8,17 @@
 
 @if (_sites == null)
 {
-    <p><em>Loading...</em></p>
+    <p><em>@SharedLocalizer["Loading"]</em></p>
 }
 else
 {
     <ActionLink Action="Add" Text="Add Site" ResourceKey="AddSite" />
 
-    <Pager Items="@_sites">
+    <Pager Items="@_sites" SearchProperties="Name">
         <Header>
             <th style="width: 1px;">&nbsp;</th>
             <th style="width: 1px;">&nbsp;</th>
-            <th>@SharedLocalizer["Name"]</th>
+            <th>@Localizer["AliasName"]</th>
         </Header>
         <Row>
             <td><button type="button" class="btn btn-primary" @onclick="@(async () => Edit(context.Name))">@SharedLocalizer["Edit"]</button></td>

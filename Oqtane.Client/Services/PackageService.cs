@@ -23,17 +23,27 @@ namespace Oqtane.Services
 
         public async Task<List<Package>> GetPackagesAsync(string type, string search, string price, string package)
         {
-            return await GetJsonAsync<List<Package>>($"{Apiurl}?type={type}&search={WebUtility.UrlEncode(search)}&price={price}&package={package}");
+            return await GetPackagesAsync(type, search, price, package, "");
         }
 
-        public async Task<Package> GetPackageAsync(string packageId, string version)
+        public async Task<List<Package>> GetPackagesAsync(string type, string search, string price, string package, string sort)
         {
-            return await PostJsonAsync<Package>($"{Apiurl}?packageid={packageId}&version={version}", null);
+            return await GetJsonAsync<List<Package>>($"{Apiurl}?type={type}&search={WebUtility.UrlEncode(search)}&price={price}&package={package}&sort={sort}");
         }
 
-        public async Task DownloadPackageAsync(string packageId, string version, string folder)
+        public async Task<List<Package>> GetPackageUpdatesAsync(string type)
         {
-            await PostAsync($"{Apiurl}?packageid={packageId}&version={version}&folder={folder}");
+            return await GetJsonAsync<List<Package>>($"{Apiurl}/updates/?type={type}");
+        }
+
+        public async Task<Package> GetPackageAsync(string packageId, string version, bool download)
+        {
+            return await PostJsonAsync<Package>($"{Apiurl}?packageid={packageId}&version={version}&download={download}&install=false", null);
+        }
+
+        public async Task DownloadPackageAsync(string packageId, string version)
+        {
+            await PostAsync($"{Apiurl}?packageid={packageId}&version={version}&download=true&install=true");
         }
 
         public async Task InstallPackagesAsync()

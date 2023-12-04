@@ -34,17 +34,37 @@ namespace Oqtane.Controllers
 
         // GET: api/<controller>?type=x&search=y&price=z&package=a
         [HttpGet]
-        public async Task<IEnumerable<Package>> Get(string type, string search, string price, string package)
+        public async Task<IEnumerable<Package>> Get(string type, string search, string price, string package, string sort)
         {
             // get packages
             List<Package> packages = new List<Package>();
-            if (bool.Parse(_configManager.GetSetting("PackageService", "true")) == true)
+            var url = _configManager.GetSetting("PackageRegistryUrl", Constants.PackageRegistryUrl);
+            if (!string.IsNullOrEmpty(url))
             {
                 using (var client = new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("Referer", HttpContext.Request.Scheme + "://" + HttpContext.Request.Host.Value);
                     client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(Constants.PackageId, Constants.Version));
-                    packages = await GetJson<List<Package>>(client, Constants.PackageRegistryUrl + $"/api/registry/packages/?id={_configManager.GetInstallationId()}&type={type.ToLower()}&version={Constants.Version}&search={search}&price={price}&package={package}");
+                    packages = await GetJson<List<Package>>(client, url + $"/api/registry/packages/?id={_configManager.GetInstallationId()}&type={type.ToLower()}&version={Constants.Version}&search={search}&price={price}&package={package}&sort={sort}");
+                }
+            }
+            return packages;
+        }
+
+        // GET: api/<controller>/updates/?type=x
+        [HttpGet("updates")]
+        public async Task<IEnumerable<Package>> GetPackageUpdates(string type)
+        {
+            // get packages
+            List<Package> packages = new List<Package>();
+            var url = _configManager.GetSetting("PackageRegistryUrl", Constants.PackageRegistryUrl);
+            if (!string.IsNullOrEmpty(url))
+            {
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("Referer", HttpContext.Request.Scheme + "://" + HttpContext.Request.Host.Value);
+                    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(Constants.PackageId, Constants.Version));
+                    packages = await GetJson<List<Package>>(client, url + $"/api/registry/updates/?id={_configManager.GetInstallationId()}&version={Constants.Version}&type={type}");
                 }
             }
             return packages;
@@ -52,32 +72,32 @@ namespace Oqtane.Controllers
 
         [HttpPost]
         [Authorize(Roles = RoleNames.Host)]
-        public async Task<Package> Post(string packageid, string version, string folder)
+        public async Task<Package> Post(string packageid, string version, string download, string install)
         {
             // get package info
             Package package = null;
-            if (bool.Parse(_configManager.GetSetting("PackageService", "true")) == true)
+            var url = _configManager.GetSetting("PackageRegistryUrl", Constants.PackageRegistryUrl);
+            if (!string.IsNullOrEmpty(url))
             {
-                var download = (string.IsNullOrEmpty(folder)) ? "false" : "true";
                 using (var client = new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("Referer", HttpContext.Request.Scheme + "://" + HttpContext.Request.Host.Value);
                     client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(Constants.PackageId, Constants.Version));
-                    package = await GetJson<Package>(client, Constants.PackageRegistryUrl + $"/api/registry/package/?id={_configManager.GetInstallationId()}&package={packageid}&version={version}&download={download}");
+                    package = await GetJson<Package>(client, url + $"/api/registry/package/?id={_configManager.GetInstallationId()}&package={packageid}&version={version}&download={download}");
                 }
 
                 if (package != null)
                 {
-                    if (bool.Parse(download))
+                    if (bool.Parse(install))
                     {
                         using (var httpClient = new HttpClient())
                         {
-                            folder = Path.Combine(_environment.ContentRootPath, folder);
+                            var folder = Path.Combine(_environment.ContentRootPath, Constants.PackagesFolder);
                             var response = await httpClient.GetAsync(package.PackageUrl).ConfigureAwait(false);
                             if (response.IsSuccessStatusCode)
                             {
                                 string filename = packageid + "." + version + ".nupkg";
-                                using (var fileStream = new FileStream(Path.Combine(folder, filename), FileMode.Create, FileAccess.Write, FileShare.None))
+                                using (var fileStream = new FileStream(Path.Combine(Constants.PackagesFolder, filename), FileMode.Create, FileAccess.Write, FileShare.None))
                                 {
                                     await response.Content.CopyToAsync(fileStream).ConfigureAwait(false);
                                 }
@@ -91,7 +111,7 @@ namespace Oqtane.Controllers
                 }
                 else
                 {
-                    _logger.Log(LogLevel.Error, this, LogFunction.Create, "Package {PackageId}.{Version} Is Not Registered", packageid, version);
+                    _logger.Log(LogLevel.Error, this, LogFunction.Create, "Package {PackageId}.{Version} Is Not Registered In The Marketplace", packageid, version);
                 }
             }
             return package;
@@ -99,17 +119,31 @@ namespace Oqtane.Controllers
 
         private async Task<T> GetJson<T>(HttpClient httpClient, string url)
         {
-            Uri uri = new Uri(url);
-            var response = await httpClient.GetAsync(uri).ConfigureAwait(false);
-            if (response.IsSuccessStatusCode)
+            try
             {
-                var stream = await response.Content.ReadAsStreamAsync();
-                using (var streamReader = new StreamReader(stream))
+                Uri uri = new Uri(url);
+                var response = await httpClient.GetAsync(uri).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode && ValidateJsonContent(response.Content))
                 {
-                    return await JsonSerializer.DeserializeAsync<T>(stream, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                    var stream = await response.Content.ReadAsStreamAsync();
+                    using (var streamReader = new StreamReader(stream))
+                    {
+                        return await JsonSerializer.DeserializeAsync<T>(stream, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                    }
                 }
+                return default(T);
             }
-            return default(T);
+            catch (Exception ex)
+            {
+                _logger.Log(LogLevel.Error, this, LogFunction.Read, ex, "Error Accessing Marketplace API {Url}", url);
+                return default(T);
+            }
+        }
+
+        private static bool ValidateJsonContent(HttpContent content)
+        {
+            var mediaType = content?.Headers.ContentType?.MediaType;
+            return mediaType != null && mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase);
         }
 
         [HttpGet("install")]

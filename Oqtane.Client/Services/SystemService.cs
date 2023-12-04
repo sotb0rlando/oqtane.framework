@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Oqtane.Documentation;
 using Oqtane.Shared;
+using System.Net;
 
 namespace Oqtane.Services
 {
@@ -32,9 +33,10 @@ namespace Oqtane.Services
         {
             await PostJsonAsync(Apiurl, settings);
         }
-        public async Task UpdateSystemInfoAsync(string settingKey, object settingValue)
+
+        public async Task<Dictionary<string, string>> GetIconsAsync()
         {
-            await PutJsonAsync($"{Apiurl}/{settingKey}/{settingValue}", "");
+            return await GetJsonAsync<Dictionary<string, string>>($"{Apiurl}/icons");
         }
     }
 }

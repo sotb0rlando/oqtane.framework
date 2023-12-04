@@ -28,7 +28,7 @@ namespace Oqtane.Controllers
 
         // GET: api/<controller>?siteid=x&global=true/false
         [HttpGet]
-        [Authorize(Policy = $"{EntityNames.Role}:{PermissionNames.Read}:{RoleNames.Registered}")]
+        [Authorize(Roles = RoleNames.Registered)]
         public IEnumerable<Role> Get(string siteid, string global)
         {
             int SiteId;
@@ -50,7 +50,7 @@ namespace Oqtane.Controllers
 
         // GET api/<controller>/5
         [HttpGet("{id}")]
-        [Authorize(Policy = $"{EntityNames.Role}:{PermissionNames.Read}:{RoleNames.Registered}")]
+        [Authorize(Roles = RoleNames.Registered)]
         public Role Get(int id)
         {
             var role = _roles.GetRole(id);
@@ -59,9 +59,16 @@ namespace Oqtane.Controllers
                 return role;
             }
             else
-            { 
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Role Get Attempt {RoleId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+            {
+                if (role != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Role Get Attempt {RoleId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -91,7 +98,7 @@ namespace Oqtane.Controllers
         [Authorize(Policy = $"{EntityNames.Role}:{PermissionNames.Write}:{RoleNames.Admin}")]
         public Role Put(int id, [FromBody] Role role)
         {
-            if (ModelState.IsValid && role.SiteId == _alias.SiteId && _roles.GetRole(role.RoleId, false) != null)
+            if (ModelState.IsValid && role.SiteId == _alias.SiteId && role.RoleId == id && _roles.GetRole(role.RoleId, false) != null)
             {
                 role = _roles.UpdateRole(role);
                 _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Role, role.RoleId, SyncEventActions.Update);

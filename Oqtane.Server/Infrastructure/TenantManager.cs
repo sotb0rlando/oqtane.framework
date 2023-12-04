@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Oqtane.Models;
@@ -37,7 +38,7 @@ namespace Oqtane.Infrastructure
                 {
                     // legacy support for client api requests which would include the alias as a path prefix ( ie. {alias}/api/[controller] )
                     int aliasId;
-                    string[] segments = httpcontext.Request.Path.Value.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    string[] segments = httpcontext.Request.Path.Value.Split('/', StringSplitOptions.RemoveEmptyEntries);
                     if (segments.Length > 1 && Shared.Constants.ReservedRoutes.Contains(segments[1]) && int.TryParse(segments[0], out aliasId))
                     {
                         alias = _aliasRepository.GetAliases().ToList().FirstOrDefault(item => item.AliasId == aliasId);
@@ -57,7 +58,7 @@ namespace Oqtane.Infrastructure
                         alias.BaseUrl = "";
                         if (httpcontext.Request.Headers.ContainsKey("User-Agent") && httpcontext.Request.Headers["User-Agent"] == Shared.Constants.MauiUserAgent)
                         {
-                            alias.BaseUrl = alias.Protocol + alias.Name;
+                            alias.BaseUrl = alias.Protocol + alias.Name.Replace("/" + alias.Path, "");
                         }
                         _siteState.Alias = alias;
                     }

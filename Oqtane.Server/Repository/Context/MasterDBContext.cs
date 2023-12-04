@@ -41,8 +41,8 @@ namespace Oqtane.Repository
             {
                 if (_config.IsInstalled())
                 {
-                    _connectionString = _config.GetConnectionString("DefaultConnection")
-                        .Replace("|DataDirectory|", AppDomain.CurrentDomain.GetData("DataDirectory")?.ToString());
+                    _connectionString = _config.GetConnectionString(SettingKeys.ConnectionStringKey)
+                        .Replace($"|{Constants.DataDirectory}|", AppDomain.CurrentDomain.GetData(Constants.DataDirectory)?.ToString());
                 }
 
                 _databaseType = _config.GetSection(SettingKeys.DatabaseSection)[SettingKeys.DatabaseTypeKey];
@@ -68,6 +68,7 @@ namespace Oqtane.Repository
         public virtual DbSet<Job> Job { get; set; }
         public virtual DbSet<JobLog> JobLog { get; set; }
         public virtual DbSet<Setting> Setting { get; set; }
+        public virtual DbSet<Theme> Theme { get; set; }
 
         public override int SaveChanges()
         {

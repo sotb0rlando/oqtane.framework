@@ -9,6 +9,7 @@ using Oqtane.Infrastructure;
 using Oqtane.Repository;
 using Oqtane.Security;
 using System.Net;
+using System.Security.Policy;
 
 namespace Oqtane.Controllers
 {
@@ -52,13 +53,13 @@ namespace Oqtane.Controllers
 
                 foreach (PageModule pagemodule in _pageModules.GetPageModules(SiteId))
                 {
-                    if (_userPermissions.IsAuthorized(User, PermissionNames.View, pagemodule.Module.Permissions))
+                    if (_userPermissions.IsAuthorized(User, PermissionNames.View, pagemodule.Module.PermissionList))
                     {
                         Module module = new Module();
                         module.SiteId = pagemodule.Module.SiteId;
                         module.ModuleDefinitionName = pagemodule.Module.ModuleDefinitionName;
                         module.AllPages = pagemodule.Module.AllPages;
-                        module.Permissions = pagemodule.Module.Permissions;
+                        module.PermissionList = pagemodule.Module.PermissionList;
                         module.CreatedBy = pagemodule.Module.CreatedBy;
                         module.CreatedOn = pagemodule.Module.CreatedOn;
                         module.ModifiedBy = pagemodule.Module.ModifiedBy;
@@ -75,13 +76,15 @@ namespace Oqtane.Controllers
                         module.Order = pagemodule.Order;
                         module.ContainerType = pagemodule.ContainerType;
 
-                        module.ModuleDefinition = moduledefinitions.Find(item => item.ModuleDefinitionName == module.ModuleDefinitionName);
+                        module.ModuleDefinition = _moduleDefinitions.FilterModuleDefinition(moduledefinitions.Find(item => item.ModuleDefinitionName == module.ModuleDefinitionName));
+
                         module.Settings = settings.Where(item => item.EntityId == pagemodule.ModuleId)
-                            .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, pagemodule.Module.Permissions))
+                            .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, pagemodule.Module.PermissionList))
                             .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue);
 
                         modules.Add(module);
                     }
+                    modules = modules.OrderBy(item => item.PageId).ThenBy(item => item.Pane).ThenBy(item => item.Order).ToList();
                 }
             }
             else
@@ -99,19 +102,26 @@ namespace Oqtane.Controllers
         public Module Get(int id)
         {
             Module module = _modules.GetModule(id);
-            if (module != null && module.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User,PermissionNames.View, module.Permissions))
+            if (module != null && module.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User,PermissionNames.View, module.PermissionList))
             {
                 List<ModuleDefinition> moduledefinitions = _moduleDefinitions.GetModuleDefinitions(module.SiteId).ToList();
-                module.ModuleDefinition = moduledefinitions.Find(item => item.ModuleDefinitionName == module.ModuleDefinitionName);
+                module.ModuleDefinition = _moduleDefinitions.FilterModuleDefinition(moduledefinitions.Find(item => item.ModuleDefinitionName == module.ModuleDefinitionName));
                 module.Settings = _settings.GetSettings(EntityNames.Module, id)
-                    .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, module.Permissions))
+                    .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(User, PermissionNames.Edit, module.PermissionList))
                     .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue);
                 return module;
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Module Get Attempt {ModuleId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (module != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Module Get Attempt {ModuleId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -144,7 +154,7 @@ namespace Oqtane.Controllers
         {
             var _module = _modules.GetModule(module.ModuleId, false);
 
-            if (ModelState.IsValid && module.SiteId == _alias.SiteId && _module != null && _userPermissions.IsAuthorized(User, module.SiteId, EntityNames.Module, module.ModuleId, PermissionNames.Edit))
+            if (ModelState.IsValid && module.SiteId == _alias.SiteId && module.ModuleId == id && _module != null && _userPermissions.IsAuthorized(User, module.SiteId, EntityNames.Module, module.ModuleId, PermissionNames.Edit))
             {
                 module = _modules.UpdateModule(module);
 

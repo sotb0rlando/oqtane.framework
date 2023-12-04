@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Oqtane.Models
 {
@@ -20,6 +22,12 @@ namespace Oqtane.Models
         public int SiteId { get; set; }
 
         /// <summary>
+        /// Path of the page.
+        /// TODO: todoc relative to what? site root, parent-page, domain?
+        /// </summary>
+        public string Path { get; set; }
+
+        /// <summary>
         /// Reference to the parent <see cref="Page"/> if it has one.
         /// </summary>
         public int? ParentId { get; set; }
@@ -34,13 +42,7 @@ namespace Oqtane.Models
         /// Page Title which is shown in the browser tab.
         /// </summary>
         public string Title { get; set; }
-        
-        /// <summary>
-        /// Path of the page.
-        /// TODO: todoc relative to what? site root, parent-page, domain?
-        /// </summary>
-        public string Path { get; set; }
-        
+                
         /// <summary>
         /// Sort order in the list of other sibling pages
         /// </summary>
@@ -63,9 +65,14 @@ namespace Oqtane.Models
         public string DefaultContainerType { get; set; }
 
         /// <summary>
-        /// Meta tags to be included in the head of the page
+        /// Content to be included in the head of the page
         /// </summary>
-        public string Meta { get; set; }
+        public string HeadContent { get; set; }
+
+        /// <summary>
+        /// Content to be included in the body of the page
+        /// </summary>
+        public string BodyContent { get; set; }
 
         /// <summary>
         /// Icon file for this page.
@@ -98,7 +105,7 @@ namespace Oqtane.Models
         public List<Resource> Resources { get; set; }
 
         [NotMapped]
-        public string Permissions { get; set; }
+        public List<Permission> PermissionList { get; set; }
 
         [NotMapped]
         public Dictionary<string, string> Settings { get; set; }
@@ -114,13 +121,27 @@ namespace Oqtane.Models
 
         #region Deprecated Properties
 
-        [Obsolete("This property is deprecated", false)]
+        [Obsolete("The EditMode property is deprecated", false)]
         [NotMapped]
         public bool EditMode { get; set; }
 
-        [Obsolete("This property is deprecated", false)]
+        [Obsolete("The LayoutType property is deprecated", false)]
         [NotMapped]
         public string LayoutType { get; set; }
+
+        [Obsolete("The Permissions property is deprecated. Use PermissionList instead", false)]
+        [NotMapped]
+        [JsonIgnore] // exclude from API payload
+        public string Permissions {
+            get
+            {
+                return JsonSerializer.Serialize(PermissionList);
+            }
+            set
+            {
+                PermissionList = JsonSerializer.Deserialize<List<Permission>>(value);
+            }
+        }
 
         #endregion
     }

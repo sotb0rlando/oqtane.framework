@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -73,7 +74,7 @@ namespace Oqtane.Pages
 
             if (file != null)
             {
-                if (file.Folder.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User, PermissionNames.View, file.Folder.Permissions))
+                if (file.Folder.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User, PermissionNames.View, file.Folder.PermissionList))
                 {
                     // calculate ETag using last modified date and file size
                     var etag = Convert.ToString(file.ModifiedOn.Ticks ^ file.Size, 16);
@@ -96,7 +97,7 @@ namespace Oqtane.Pages
                             }
                             else
                             {
-                                HttpContext.Response.Headers.Add(HeaderNames.ETag, etag);
+                                HttpContext.Response.Headers.Append(HeaderNames.ETag, etag);
                                 return PhysicalFile(filepath, file.GetMimeType());
                             }
                         }
